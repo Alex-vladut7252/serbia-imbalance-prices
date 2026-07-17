@@ -73,22 +73,19 @@
   <p class="sub">Control area 10YCS-SERBIATSOV &middot; 15-min settlement &middot; Europe/Belgrade time &middot;
      ENTSO-E docType A85 (price) + A86 (direction). Serbia runs a <b>single imbalance price</b>.</p>
   <p class="sub" style="border:1px solid var(--bd);border-radius:8px;padding:10px 12px;background:var(--sunk)">
-     <b>Every colour on this page means one thing: your money.</b>
-     <b class="pos">Green = that quarter pays you.</b> <b class="neg">Red = you pay.</b>
-     <b style="color:var(--dim)">Grey = the price was exactly 0.00, so nothing changes hands.</b>
-     It follows from <b>your position</b> (set above) against the <b>price's sign</b>: you are paid whenever the
-     two are opposite. Flip short&harr;long and every colour flips with it.
-     The system's own surplus/deficit is <b>not</b> shown, because it does not affect your settlement and its
-     sign does not track the price's &mdash; of 310 negative prices between 1 Jun and 17 Jul 2026,
-     <b>147 happened in surplus and 163 in deficit</b>.</p>
+     <b>Every colour here means one thing: your money, as someone who sold energy and couldn't deliver.</b>
+     <b class="neg">Red = the price was positive, so you pay.</b>
+     <b class="pos">Green = the price was negative, so you're paid.</b>
+     <b style="color:var(--dim)">Grey = the price was exactly 0.00 &mdash; nothing changes hands.</b>
+     Mostly red is correct, not a bug: Serbia's price is positive ~85&ndash;92&nbsp;% of the time. Being short is
+     a <b>bet the price goes below zero</b>, and it usually doesn't.
+     The system's own surplus/deficit is not shown &mdash; it never enters your settlement, and its sign does not
+     track the price's: of 310 negative prices between 1 Jun and 17 Jul 2026, <b>147 happened in surplus and 163
+     in deficit</b>.</p>
 
   <div class="card">
     <h2>Filters</h2>
     <div class="ctl">
-      <div class="fld"><label>Your position &mdash; colours the whole page</label><select id="pos">
-        <option value="-1" selected>Short &mdash; I sold it and couldn't deliver</option>
-        <option value="1">Long &mdash; I delivered more than I sold</option>
-      </select></div>
       <div class="fld"><label>From date</label><input type="date" id="startDate" min="2025-12-30" max="2026-07-16" value="2026-07-02"></div>
       <div class="fld"><label>To date</label><input type="date" id="endDate" min="2025-12-30" max="2026-07-16" value="2026-07-15"></div>
       <div class="fld"><label>Hour window (local)</label>
@@ -115,17 +112,16 @@
   <div class="card">
     <h2>Do these imbalances pay you, or do you pay them?</h2>
     <div class="fx">
-      <code><b>your signed volume (MWh)</b> &nbsp;&times;&nbsp; <b>imbalance price</b> &nbsp;=&nbsp; settlement</code>
-      <div class="fxn"><b>You are paid whenever your sign is the opposite of the price's sign.</b>
-        Short = you delivered less than you sold &rarr; your volume is <b class="neg">negative</b>.
-        Long = you delivered more &rarr; <b class="pos">positive</b>.
-        50&nbsp;MW for a quarter = 12.5&nbsp;MWh.
-        <br>The <b>system's</b> surplus/deficit is <b>not</b> in this formula and never affects your money
-        &mdash; only your own position does. Set your position in the <b>Filters</b> at the top; it colours
-        every chart on this page.</div>
+      <code>&minus;(MW &times; 0.25 h) &nbsp;&times;&nbsp; <b>imbalance price</b> &nbsp;=&nbsp; settlement</code>
+      <div class="fxn">You <b>sold energy and couldn't deliver</b>, so you are <b>short</b> and your volume is
+        <b>negative</b>. 50&nbsp;MW for a quarter = &minus;12.5&nbsp;MWh.
+        <b class="neg">Price positive &rarr; you pay.</b> <b class="pos">Price negative &rarr; you're paid.</b>
+        <br>Two things are deliberately absent. The <b>system's</b> surplus/deficit &mdash; it never enters
+        settlement. And a long/short switch &mdash; Serbia is <b>single price</b>, so being long is the same
+        number with the opposite sign, and a control that only negates tells you nothing.</div>
     </div>
     <div class="ctl" style="margin-bottom:14px">
-      <div class="fld"><label>Quantity in imbalance (MW, <b>every hour</b>)</label><input type="number" id="qty" value="50" min="0" step="1"></div>
+      <div class="fld"><label>Quantity short (MW, <b>every hour</b>)</label><input type="number" id="qty" value="50" min="0" step="1"></div>
       <div class="fld"><label>Hours to include (local)</label>
         <div class="row"><select id="cHourFrom"></select><span style="color:var(--mut)">to</span><select id="cHourTo"></select></div></div>
       <div class="fld"><label>Quick hours</label>
@@ -248,7 +244,13 @@ const daily=new Chart($('daily'),{type:'bar',data:{labels:[],datasets:[]},option
 const prof=new Chart($('prof'),{type:'bar',data:{labels:[],datasets:[]},options:noLeg()});
 
 function recompute(){
-  const POS=+$('pos').value;        // -1 short, +1 long -- drives every colour on the page
+  // You are SHORT: you sold energy and couldn't deliver, so your volume is negative.
+  // Long is not a setting because it carries no information here -- Serbia is single
+  // price (A04 == A05 in all 19,008 intervals), so a long position settles at the
+  // identical magnitude with the opposite sign. A dropdown whose only effect is *-1
+  // is noise. In a DUAL-price market the two sides settle at different prices and
+  // this would not hold.
+  const POS=-1;
   const MONEY=r=>{const p=IMB(r);return p==null?null:POS*p;};   // sign of your settlement
   const s=$('startDate').value, e=$('endDate').value;
   let hf=+$('hourFrom').value, ht=+$('hourTo').value; if(ht<=hf)ht=hf+1,$('hourTo').value=ht;
@@ -372,7 +374,7 @@ function recompute(){
   $('cPaysM').textContent=(cells-winC)+' hours in deficit \u00b7 you paid';
   $('cWin').textContent=cells?Math.round(100*winC/cells)+'%':'--';
   $('cWin').className='val '+(winC?'pos':'');
-  $('cWinM').textContent=winC+' of '+cells+' hours · '+(POS<0?'short':'long')+' '+Q+' MW';
+  $('cWinM').textContent=winC+' of '+cells+' hours · short '+Q+' MW';
 
   // sqrt ramp: linear against maxAbs let one outlier saturate the scale and wash
   // the mid-range out to near-invisible. sqrt keeps the extreme readable AND the
