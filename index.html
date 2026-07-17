@@ -95,9 +95,21 @@
   </div>
 
   <div class="card">
-    <h2>P&amp;L calculator &mdash; you accept the imbalance instead of buying it back</h2>
-    <p class="note" style="margin:0 0 12px">You sold this quantity and can't deliver. You have <b>two ways out</b>:
-      <b>buy it back on the IDM</b>, or <b class="pos">accept the imbalance</b> and let it settle at the imbalance price.
+    <h2>P&amp;L calculator &mdash; you accept the imbalance</h2>
+    <p class="note" id="rawNote" style="margin:0 0 12px">You sold this quantity, can't deliver, and you
+      <b class="pos">just accept the imbalance</b> &mdash; no buying back, no struggling. This is simply
+      <b>what the settlement does to your money</b>:
+      <b>settlement = &minus;imbalance price &times; MW &times; hours</b>.
+      <b class="neg">Red = the price was positive, so you pay it.</b>
+      <b class="pos">Green = the price went negative, so the TSO pays you.</b> Expect mostly red: Serbia's imbalance
+      price is positive ~85&nbsp;% of the time, so accepting it usually costs something &mdash; the question is only
+      <i>how much</i>, and whether it beat the alternative (switch the dropdown to compare against a buy-back).
+      <b>Assumption:</b> one delivery = one day over the chosen hours; each row below is a real historical day, and the
+      headline numbers use a <b>typical (average) day</b>. Date range comes from the filters above. The <b>same MW is
+      held in every chosen hour</b> (it's a power), so one day = quantity &times; hours of energy &mdash; e.g.
+      50&nbsp;MW over 5&nbsp;h = 250&nbsp;MWh.</p>
+    <p class="note" id="cmpNote" style="margin:0 0 12px;display:none">You sold this quantity and can't deliver. Two ways
+      out: <b>buy it back on the IDM</b>, or <b class="pos">accept the imbalance</b> and let it settle.
       This shows <b>which one was cheaper</b>:
       <b>P&amp;L = (IDM buy-back price &minus; imbalance price) &times; MW &times; hours</b>.
       <b class="pos">Green = accepting the imbalance was cheaper &mdash; you made money by staying in imbalance.</b>
@@ -110,12 +122,13 @@
       50&nbsp;MW over 5&nbsp;h = 250&nbsp;MWh.</p>
     <div class="ctl" style="margin-bottom:14px">
       <div class="fld"><label>Quantity in imbalance (MW, <b>every hour</b>)</label><input type="number" id="qty" value="50" min="0" step="1"></div>
-      <div class="fld"><label>What buying it back on IDM would cost you</label>
+      <div class="fld"><label>Compare against buying it back?</label>
         <div class="row"><select id="saleMode">
-          <option value="dap" selected>DAM + premium &rarr;</option>
-          <option value="da">DAM day-ahead exactly (low proxy)</option>
-          <option value="fix">Fixed IDM price &rarr;</option>
-        </select><input type="number" id="salePx" value="20" min="-500" step="1" style="width:80px"></div></div>
+          <option value="none" selected>No &mdash; just accept it, show me the settlement</option>
+          <option value="dap">Yes: DAM + premium &rarr;</option>
+          <option value="da">Yes: DAM day-ahead exactly (low proxy)</option>
+          <option value="fix">Yes: fixed IDM price &rarr;</option>
+        </select><input type="number" id="salePx" value="20" min="-500" step="1" style="width:80px" disabled></div></div>
       <div class="fld"><label>Hours to include (local)</label>
         <div class="row"><select id="cHourFrom"></select><span style="color:var(--mut)">to</span><select id="cHourTo"></select></div></div>
       <div class="fld"><label>Quick hours</label>
@@ -129,11 +142,11 @@
         </div></div>
     </div>
     <div class="kpis" style="margin-bottom:16px">
-      <div class="kpi big"><div class="lbl">Expected P&amp;L / delivery</div><div class="val" id="cExp">--</div><div class="meta" id="cExpM"></div></div>
+      <div class="kpi big"><div class="lbl" id="cExpL">Expected P&amp;L / delivery</div><div class="val" id="cExp">--</div><div class="meta" id="cExpM"></div></div>
       <div class="kpi big"><div class="lbl">Total (all days in range)</div><div class="val" id="cTot">--</div><div class="meta" id="cTotM"></div></div>
       <div class="kpi"><div class="lbl">Worst day</div><div class="val neg" id="cWorst">--</div><div class="meta" id="cWorstM"></div></div>
       <div class="kpi"><div class="lbl">Best day</div><div class="val pos" id="cBest">--</div><div class="meta" id="cBestM"></div></div>
-      <div class="kpi"><div class="lbl">Hours imbalance was cheaper</div><div class="val" id="cWin">--</div><div class="meta" id="cWinM"></div></div>
+      <div class="kpi"><div class="lbl" id="cWinL">Hours imbalance was cheaper</div><div class="val" id="cWin">--</div><div class="meta" id="cWinM"></div></div>
       <div class="kpi"><div class="lbl">Energy / delivery</div><div class="val" id="cEnergy">--</div><div class="meta" id="cEnergyM"></div></div>
     </div>
     <p class="note" style="margin:0 0 10px">Each row = one day = <b>one possible delivery</b>; cells are the P&amp;L for each hour
@@ -305,8 +318,10 @@ function recompute(){
   // DAM + premium (default), plain DAM, or a fixed price the user types.
   const Q=+$('qty').value||0;
   const saleMode=$('saleMode').value, px=+$('salePx').value||0;
-  $('salePx').disabled = saleMode==='da';
-  const BUY=r=>saleMode==='fix'?px:(saleMode==='dap'?(DA(r)==null?null:DA(r)+px):DA(r));
+  const raw=saleMode==='none';                       // no buy-back leg at all
+  $('salePx').disabled = (saleMode==='da'||raw);
+  // raw mode: buy-back price 0 -> P&L collapses to -imb*Q*h, the settlement itself
+  const BUY=r=>raw?0:(saleMode==='fix'?px:(saleMode==='dap'?(DA(r)==null?null:DA(r)+px):DA(r)));
   let cHf=+$('cHourFrom').value, cHt=+$('cHourTo').value; if(cHt<=cHf)cHt=cHf+1,$('cHourTo').value=cHt;
   const cWin=pad(cHf)+':00-'+pad(cHt)+':00';
   const cw=dsub.filter(r=>{const h=r[1]/4|0;return h>=cHf&&h<cHt;});   // calculator's own hours
@@ -327,8 +342,13 @@ function recompute(){
 
   $('cExp').innerHTML=expected==null?'--':eur(expected);
   $('cExp').className='val '+((expected||0)>=0?'pos':'neg');
-  $('cExpM').textContent='typical day \u00b7 '+Q+' MW, '+cWin+' \u00b7 vs buy-back at '
-    +(saleMode==='fix'?px+' EUR/MWh':(saleMode==='dap'?'DAM+'+px:'DAM'));
+  $('cExpM').textContent='typical day \u00b7 '+Q+' MW, '+cWin+' \u00b7 '
+    +(raw?'settlement only, no buy-back':'vs buy-back at '
+      +(saleMode==='fix'?px+' EUR/MWh':(saleMode==='dap'?'DAM+'+px:'DAM')));
+  $('cExpL').textContent=raw?'What accepting it settles at':'Expected P&L / delivery';
+  $('cWinL').textContent=raw?'Hours the TSO pays you':'Hours imbalance was cheaper';
+  $('rawNote').style.display=raw?'':'none';
+  $('cmpNote').style.display=raw?'none':'';
   $('cWorst').innerHTML=worstD?eur(worstD.t):'--'; $('cWorstM').textContent=worstD?DATES[worstD.i]:'';
   $('cBest').innerHTML=bestD?eur(bestD.t):'--'; $('cBestM').textContent=bestD?DATES[bestD.i]:'';
   $('cEnergy').innerHTML=fmt(energyDel)+' <span class="un">MWh</span>';
@@ -340,7 +360,8 @@ function recompute(){
   dIdx.forEach(i=>hoursList.forEach(h=>{const v=dh[i*100+h];if(v!=null){cells++;if(v>0)winC++;}}));
   $('cWin').textContent=cells?Math.round(100*winC/cells)+'%':'--';
   $('cWin').className='val '+(winC?'pos':'');
-  $('cWinM').textContent=winC+' of '+cells+' hours where imbalance beat buying it back';
+  $('cWinM').textContent=winC+' of '+cells+(raw?' hours the imbalance price went negative'
+    :' hours where imbalance beat buying it back');
 
   const heatBg=v=>{if(v==null)return 'transparent';
     const a=maxAbs?(0.12+0.8*Math.min(1,Math.abs(v)/maxAbs)):0.3;
