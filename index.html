@@ -135,13 +135,20 @@
         </div></div>
     </div>
     <div class="kpis" style="margin-bottom:16px">
-      <div class="kpi big"><div class="lbl">They pay you</div><div class="val pos" id="cPaid">--</div><div class="meta" id="cPaidM"></div></div>
-      <div class="kpi big"><div class="lbl">You pay them</div><div class="val neg" id="cPays">--</div><div class="meta" id="cPaysM"></div></div>
-      <div class="kpi big"><div class="lbl">Net</div><div class="val" id="cTot">--</div><div class="meta" id="cTotM"></div></div>
+      <div class="kpi big"><div class="lbl">Per MWh you are short</div><div class="val" id="cPer">--</div><div class="meta" id="cPerM"></div></div>
       <div class="kpi"><div class="lbl" id="cWinL">Hours that pay you</div><div class="val" id="cWin">--</div><div class="meta" id="cWinM"></div></div>
+      <div class="kpi"><div class="lbl">They pay you</div><div class="val pos" id="cPaid">--</div><div class="meta" id="cPaidM"></div></div>
+      <div class="kpi"><div class="lbl">You pay them</div><div class="val neg" id="cPays">--</div><div class="meta" id="cPaysM"></div></div>
+      <div class="kpi"><div class="lbl">Net</div><div class="val" id="cTot">--</div><div class="meta" id="cTotM"></div></div>
     </div>
     <p class="note" style="margin:0 0 10px">One row per day, one cell per hour, EUR.
       <b class="pos">Green = paid you</b>, <b class="neg">red = you paid</b>. Last column = the day's net.</p>
+    <p class="note" style="border-left:2px solid var(--acc);padding-left:10px;margin:0 0 12px">
+      <b>The totals assume you are short the whole time.</b> At 50&nbsp;MW across the full archive that is
+      237,600&nbsp;MWh &mdash; never delivering, day and night, for 6.5 months. The entire Serbian system
+      averages <b>27.2&nbsp;MWh</b> of imbalance per quarter, so that position would be ~46&nbsp;% of the
+      country's imbalance every quarter for 199 days. It is a yardstick, not a forecast.
+      <b>Per MWh is the number that transfers to a real position.</b></p>
     <div id="calcHeat" style="overflow-x:auto"></div>
   </div>
 
@@ -362,6 +369,15 @@ function recompute(){
   const expected=dayTot.length?dayTot.reduce((s,d)=>s+d.t,0)/dayTot.length:null;
 
   const total=dayTot.reduce((s,d)=>s+d.t,0);
+  // Scale-free headline: settlement per MWh short = -(average price). This is the
+  // only figure here that transfers to a real position; the totals below assume you
+  // are short Q MW in EVERY quarter of the range, which no BRP ever is.
+  const cwp=cw.map(IMB).filter(v=>v!=null);
+  const perMWh=cwp.length?-cwp.reduce((a,x)=>a+x,0)/cwp.length:null;
+  $('cPer').innerHTML=perMWh==null?'--':eur(perMWh)+' <span class="un">/MWh</span>';
+  $('cPer').className='val '+((perMWh||0)>=0?'pos':'neg');
+  $('cPerM').textContent='multiply by however many MWh you are actually short';
+  const energy=Q*0.25*cwp.length;
   $('cTot').innerHTML=dayTot.length?eur(total):'--'; $('cTot').className='val '+((total||0)>=0?'pos':'neg');
   $('cTotM').textContent=dayTot.length+' days summed \u00b7 what they pay you minus what you pay';
   // split the two directions apart: what pays you vs what you pay
