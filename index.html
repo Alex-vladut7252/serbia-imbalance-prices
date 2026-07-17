@@ -157,6 +157,23 @@
   </div>
 
   <div class="card">
+    <h2>When do you get paid?</h2>
+    <div class="kpis" style="margin-bottom:16px">
+      <div class="kpi big"><div class="lbl">They pay you</div><div class="val pos" id="sPaid">--</div><div class="meta" id="sPaidM"></div></div>
+      <div class="kpi"><div class="lbl">Nothing changes hands</div><div class="val" id="sZero">--</div><div class="meta">price exactly 0.00</div></div>
+      <div class="kpi"><div class="lbl">You pay</div><div class="val neg" id="sPay">--</div><div class="meta" id="sPayM"></div></div>
+      <div class="kpi"><div class="lbl">Best hour of the day</div><div class="val pos" id="sBestH">--</div><div class="meta" id="sBestHM"></div></div>
+      <div class="kpi"><div class="lbl">Worst hour of the day</div><div class="val neg" id="sWorstH">--</div><div class="meta" id="sWorstHM"></div></div>
+    </div>
+    <canvas id="payHours"></canvas>
+    <p class="note" id="payNote"></p>
+    <p class="note">Share of quarters in each hour where the <b>price went below zero</b> &mdash; the only quarters
+      that pay a short. <b>Uses the date range only</b>, so every hour is comparable; the hour window above does
+      not filter it. This is the whole game: being short is a <b>bet the price goes negative</b>, and that is a
+      <b>midday</b> event.</p>
+  </div>
+
+  <div class="card">
     <h2>Hour focus &mdash; same hour on every day, by quarter</h2>
     <div class="ctl" style="margin-bottom:12px">
       <div class="fld"><label>Hour</label><select id="focusHour"></select></div>
@@ -251,6 +268,11 @@ const baseOpts=()=>({responsive:true,interaction:{mode:'index',intersect:false},
   plugins:{legend:{labels:{color:'#e6edf3'}}}});
 const noLeg=()=>{const o=baseOpts();o.plugins.legend.display=false;return o;};
 const hourFocus=new Chart($('hourFocus'),{type:'bar',data:{labels:[],datasets:[]},options:noLeg()});
+const payOpts=(()=>{const o=noLeg();
+  o.scales.y.title={display:true,text:'% of quarters that pay you',color:'#a3b1c2'};
+  o.plugins.tooltip={callbacks:{label:i=>fmt(i.parsed.y)+'% of quarters pay you'}};
+  return o;})();
+const payHours=new Chart($('payHours'),{type:'bar',data:{labels:[],datasets:[]},options:payOpts});
 const daily=new Chart($('daily'),{type:'bar',data:{labels:[],datasets:[]},options:noLeg()});
 const prof=new Chart($('prof'),{type:'bar',data:{labels:[],datasets:[]},options:noLeg()});
 
@@ -417,6 +439,42 @@ function recompute(){
   out+='<td class="'+((expected||0)>=0?'win':'lose')+'"><b>'+num(expected)+'</b></td></tr></tfoot></table>';
   $('calcHeat').innerHTML=out;
 
+  // ---- stats: when do you get paid? ----
+  // A short is paid only when the price goes below zero. Date range only, so the
+  // hours stay comparable; the hour window deliberately does not filter this.
+  const byH=Array.from({length:24},()=>({n:0,paid:0,zero:0,eur:0}));
+  let sN=0,sP=0,sZ=0,sEurPaid=0,sEurPay=0;
+  dsub.forEach(r=>{const p=IMB(r); if(p==null)return; const o=byH[r[1]/4|0];
+    o.n++; sN++;
+    if(p<0){o.paid++; sP++; o.eur+=-p*Q*0.25; sEurPaid+=-p*Q*0.25;}
+    else if(p===0){o.zero++; sZ++;}
+    else sEurPay+=-p*Q*0.25;});
+  const pct=(a,b)=>b?100*a/b:0;
+  payHours.data.labels=byH.map((_,h)=>pad(h)+'h');
+  const maxPct=Math.max(...byH.map(o=>pct(o.paid,o.n)),1);
+  payHours.data.datasets=[{label:'pays you',data:byH.map(o=>+pct(o.paid,o.n).toFixed(1)),
+    backgroundColor:byH.map(o=>'rgba(63,185,80,'+(0.15+0.8*pct(o.paid,o.n)/maxPct).toFixed(2)+')'),
+    borderColor:'#3fb950',borderWidth:1}];
+  payHours.update();
+  $('sPaid').textContent=pct(sP,sN).toFixed(1)+'%';
+  $('sPaidM').textContent=sP.toLocaleString('en')+' of '+sN.toLocaleString('en')+' quarters · '+eur(sEurPaid);
+  $('sZero').textContent=pct(sZ,sN).toFixed(1)+'%';
+  $('sPay').textContent=pct(sN-sP-sZ,sN).toFixed(1)+'%';
+  $('sPayM').textContent=eur(sEurPay);
+  const ranked=byH.map((o,h)=>({h,p:pct(o.paid,o.n),n:o.n})).filter(o=>o.n);
+  if(ranked.length){
+    const bh=ranked.reduce((a,x)=>x.p>a.p?x:a), wh=ranked.reduce((a,x)=>x.p<a.p?x:a);
+    $('sBestH').textContent=pad(bh.h)+':00';
+    $('sBestHM').textContent=bh.p.toFixed(1)+'% of quarters pay you';
+    $('sWorstH').textContent=pad(wh.h)+':00';
+    $('sWorstHM').textContent=wh.p.toFixed(1)+'% of quarters pay you';
+  }
+  {const night=byH.slice(0,5).reduce((a,o)=>({p:a.p+o.paid,n:a.n+o.n}),{p:0,n:0});
+   const mid=byH.slice(10,16).reduce((a,o)=>({p:a.p+o.paid,n:a.n+o.n}),{p:0,n:0});
+   $('payNote').innerHTML='Over '+dIdx.length+' days: <b class="pos">midday (10-16) pays you '
+     +pct(mid.p,mid.n).toFixed(1)+'%</b> of quarters, <b class="neg">night (00-05) only '
+     +pct(night.p,night.n).toFixed(1)+'%</b>'
+     +(night.p?' &mdash; that is '+(pct(mid.p,mid.n)/pct(night.p,night.n)).toFixed(1)+'x more often at midday.':'.');}
   syncPresets();
 }
 
