@@ -18,7 +18,8 @@
 //# sourceMappingURL=chart.umd.min.js.map
 </script>
 <style>
-  :root{--bg:#0f1419;--card:#1a2230;--pan:#141b26;--fg:#e6edf3;--mut:#8b98a9;
+  :root{--bg:#0f1419;--card:#1a2230;--pan:#141b26;--sunk:#0d1520;--hov:#1e2937;
+        --fg:#e6edf3;--mut:#a3b1c2;--dim:#8b98a9;
         --acc:#f0b429;--pos:#3fb950;--neg:#f85149;--blue:#58a6ff;--bd:#2a3441}
   *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);
     font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;padding:24px}
@@ -35,6 +36,8 @@
   .presets{display:flex;gap:6px;flex-wrap:wrap}
   .presets button{background:var(--pan);color:var(--fg);border:1px solid var(--bd);border-radius:20px;padding:6px 12px;font-size:13px;cursor:pointer}
   .presets button:hover{border-color:var(--acc);color:var(--acc)}
+  .presets button.active{background:var(--acc);border-color:var(--acc);color:#0f1419;font-weight:600}
+  .presets button.active:hover{color:#0f1419}
   .seg{display:inline-flex;border:1px solid var(--bd);border-radius:8px;overflow:hidden}
   .seg label{padding:8px 16px;cursor:pointer;font-size:14px;background:var(--pan);color:var(--mut)}
   .seg input{display:none}
@@ -42,32 +45,34 @@
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px}
   .kpi{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px}
   .kpi .lbl{font-size:12px;color:var(--mut);margin-bottom:6px}
-  .kpi .val{font-size:26px;font-weight:700;line-height:1.1}
+  .kpi .val{font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
   .kpi .un{font-size:13px;color:var(--mut);font-weight:400}
   .kpi .meta{font-size:12px;color:var(--mut);margin-top:4px}
-  .kpi.big{border-color:var(--acc)}
+  .kpi.big .val{font-size:30px}
   .val.pos{color:var(--pos)} .val.neg{color:var(--neg)}
   .note{color:var(--mut);font-size:12px;margin-top:8px}
   b.pos{color:var(--pos)} b.neg{color:var(--neg)}
-  .fx{border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin:0 0 14px;background:#0d1520}
-  .fx code{font-size:15px;color:#e6edf3;display:block;line-height:1.6}
+  .fx{border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin:0 0 14px;background:var(--sunk)}
+  .fx code{font-size:15px;color:var(--fg);display:block;line-height:1.6}
   .fxn{color:var(--mut);font-size:13px;margin-top:6px}
   input[type=number]{width:140px}
-  table{border-collapse:collapse;width:100%;font-size:13px}
+  table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
   th,td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--bd)}
   th{color:var(--mut);font-weight:600}
   td:first-child,th:first-child{text-align:left}
   td.win{color:var(--pos)} td.lose{color:var(--neg)}
-  tbody tr:hover{background:#1e2937}
+  tbody tr:hover{background:var(--hov)}
   #calcHeat td,#calcHeat th{font-size:11px;padding:4px 7px;white-space:nowrap}
   #calcHeat tfoot td{border-top:2px solid var(--bd)}
+  input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+  @media(max-width:600px){body{padding:12px} .card{padding:14px} .ctl{gap:12px}}
   #calcHeat td:first-child,#calcHeat th:first-child{position:sticky;left:0;background:var(--card)}
 </style></head>
 <body><div class="wrap">
   <h1>Serbian Imbalance Prices</h1>
   <p class="sub">Control area 10YCS-SERBIATSOV &middot; 15-min settlement &middot; Europe/Belgrade time &middot;
      ENTSO-E docType A85 (price) + A86 (direction). Serbia runs a <b>single imbalance price</b>.</p>
-  <p class="sub" style="border:1px solid var(--bd);border-radius:8px;padding:10px 12px;background:#0d1520">
+  <p class="sub" style="border:1px solid var(--bd);border-radius:8px;padding:10px 12px;background:var(--sunk)">
      <b>One colour scale, everywhere on this page.</b>
      <b class="pos">Green = the system was in surplus &rarr; the imbalance pays you.</b>
      <b class="neg">Red = the system was in deficit &rarr; you pay it.</b>
@@ -220,10 +225,10 @@ const dirLine=v=>v==null?'#8b98a9':(v>=0?'#3fb950':'#f85149');
   od.value='2026-07-15'; of.value=0; ot.value=24;
 })();
 
-const grid={color:'#2a3441'}, tick={color:'#8b98a9'};
+const grid={color:'#2a3441'}, tick={color:'#a3b1c2'};
 const baseOpts=()=>({responsive:true,interaction:{mode:'index',intersect:false},
   scales:{x:{grid,ticks:tick},
-    y:{grid,ticks:tick,title:{display:true,text:'EUR/MWh',color:'#8b98a9'}}},
+    y:{grid,ticks:tick,title:{display:true,text:'EUR/MWh',color:'#a3b1c2'}}},
   plugins:{legend:{labels:{color:'#e6edf3'}}}});
 const noLeg=()=>{const o=baseOpts();o.plugins.legend.display=false;return o;};
 const hourFocus=new Chart($('hourFocus'),{type:'bar',data:{labels:[],datasets:[]},options:noLeg()});
@@ -351,8 +356,11 @@ function recompute(){
   $('cWin').className='val '+(winC?'pos':'');
   $('cWinM').textContent=winC+' of '+cells+' hours';
 
+  // sqrt ramp: linear against maxAbs let one outlier saturate the scale and wash
+  // the mid-range out to near-invisible. sqrt keeps the extreme readable AND the
+  // ordinary cells distinguishable. Colour only -- the numbers are untouched.
   const heatBg=v=>{if(v==null)return 'transparent';
-    const a=maxAbs?(0.12+0.8*Math.min(1,Math.abs(v)/maxAbs)):0.3;
+    const a=maxAbs?(0.10+0.85*Math.sqrt(Math.min(1,Math.abs(v)/maxAbs))):0.3;
     return (v>=0?'rgba(63,185,80,':'rgba(248,81,73,')+a.toFixed(2)+')';};
   const num=v=>v==null?'':Math.round(v).toLocaleString('en');
   let out='<table><thead><tr><th>Day (one delivery)</th>'+hoursList.map(h=>'<th>'+pad(h)+'h</th>').join('')
@@ -369,18 +377,22 @@ function recompute(){
   out+='<td class="'+((expected||0)>=0?'win':'lose')+'"><b>'+num(expected)+'</b></td></tr></tfoot></table>';
   $('calcHeat').innerHTML=out;
 
+  syncPresets();
 }
 
 document.querySelectorAll('input,select').forEach(el=>el.addEventListener('change',recompute));
 $('qty').addEventListener('input',recompute);
-document.querySelectorAll('.presets button:not(.cpreset)').forEach(b=>b.addEventListener('click',()=>{
-  $('hourFrom').value=b.dataset.f;$('hourTo').value=b.dataset.t;recompute();}));
-document.querySelectorAll('.cpreset').forEach(b=>b.addEventListener('click',()=>{
-  $('cHourFrom').value=b.dataset.f;$('cHourTo').value=b.dataset.t;recompute();}));
-document.querySelectorAll('.opreset').forEach(b=>b.addEventListener('click',()=>{
-  $('oneFrom').value=b.dataset.f;$('oneTo').value=b.dataset.t;recompute();}));
-document.querySelectorAll('.opreset').forEach(b=>b.addEventListener('click',()=>{
-  $('oneFrom').value=b.dataset.f;$('oneTo').value=b.dataset.t;recompute();}));
+// Each preset row drives ONLY its own card. ':not(.cpreset):not(.opreset)' matters:
+// the calculator and one-day rows live inside .presets too, so a bare
+// '.presets button' would make their buttons also move the top filter.
+const PRESETS=[['.presets button:not(.cpreset):not(.opreset)','hourFrom','hourTo'],
+               ['.cpreset','cHourFrom','cHourTo'],
+               ['.opreset','oneFrom','oneTo']];
+PRESETS.forEach(([sel,f,t])=>document.querySelectorAll(sel).forEach(b=>
+  b.addEventListener('click',()=>{$(f).value=b.dataset.f;$(t).value=b.dataset.t;recompute();})));
+// light up whichever preset matches the current hour window
+function syncPresets(){PRESETS.forEach(([sel,f,t])=>document.querySelectorAll(sel).forEach(b=>
+  b.classList.toggle('active',+b.dataset.f===+$(f).value&&+b.dataset.t===+$(t).value)));}
 recompute();
 </script>
 </body></html>
