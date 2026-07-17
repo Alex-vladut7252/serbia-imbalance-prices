@@ -116,9 +116,13 @@
       <div class="fxn">You <b>sold energy and couldn't deliver</b>, so you are <b>short</b> and your volume is
         <b>negative</b>. 50&nbsp;MW for a quarter = &minus;12.5&nbsp;MWh.
         <b class="neg">Price positive &rarr; you pay.</b> <b class="pos">Price negative &rarr; you're paid.</b>
-        <br>Two things are deliberately absent. The <b>system's</b> surplus/deficit &mdash; it never enters
-        settlement. And a long/short switch &mdash; Serbia is <b>single price</b>, so being long is the same
-        number with the opposite sign, and a control that only negates tells you nothing.</div>
+        <br>The <b>system's</b> surplus/deficit is deliberately absent &mdash; it never enters settlement.
+        So is a long/short switch: Serbia is <b>single price</b>, so long is the same number with the opposite
+        sign, and a control that only negates tells you nothing.
+        <br><b>Assumes you are paid in the favourable direction, at full price.</b> True only inside your
+        tolerance band (ПОБ). Beyond it, EMS Market Rules &sect;7.6.2.1 pays you <b>0.7&times;</b> and charges you
+        <b>1.2&times;</b> &mdash; and a group holding only exchange blocks and trades (no delivery point, no
+        balancing resource) is <b>never paid</b> at all (&sect;7.6.1.3) and has a band of <b>zero</b>.</div>
     </div>
     <div class="ctl" style="margin-bottom:14px">
       <div class="fld"><label>Quantity short (MW, <b>every hour</b>)</label><input type="number" id="qty" value="50" min="0" step="1"></div>
