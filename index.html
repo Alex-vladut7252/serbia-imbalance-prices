@@ -95,29 +95,27 @@
   </div>
 
   <div class="card">
-    <h2>P&amp;L calculator &mdash; your imbalance position</h2>
-    <p class="note" style="margin:0 0 12px">Two opposite cases, and the money runs opposite ways:
-      <b class="pos">LONG (positive imbalance)</b> &mdash; you're left holding energy, so the TSO <b>pays you</b> the
-      imbalance price instead of the market price you'd have got:
-      <b>P&amp;L = (imbalance price &minus; market price) &times; MW &times; hours</b>.
-      <b class="neg">SHORT (negative imbalance)</b> &mdash; you sold energy and didn't deliver, so you <b>buy it back</b>
-      at the imbalance price: <b>P&amp;L = (market price &minus; imbalance price) &times; MW &times; hours</b>.
-      Either way both legs count &mdash; the market leg <i>and</i> the imbalance leg.
+    <h2>P&amp;L calculator &mdash; you accept the imbalance instead of buying it back</h2>
+    <p class="note" style="margin:0 0 12px">You sold this quantity and can't deliver. You have <b>two ways out</b>:
+      <b>buy it back on the IDM</b>, or <b class="pos">accept the imbalance</b> and let it settle at the imbalance price.
+      This shows <b>which one was cheaper</b>:
+      <b>P&amp;L = (IDM buy-back price &minus; imbalance price) &times; MW &times; hours</b>.
+      <b class="pos">Green = accepting the imbalance was cheaper &mdash; you made money by staying in imbalance.</b>
+      <b class="neg">Red = you should have bought it back.</b>
+      <b>The price you originally sold at doesn't appear</b> &mdash; you were paid it either way, so it cancels out;
+      only buy-back vs imbalance moves your money.
       <b>Assumption:</b> one delivery = one day over the chosen hours; each row below is a real historical day, and the
       headline numbers use a <b>typical (average) day</b>. Date range comes from the filters above. The <b>same MW is
       held in every chosen hour</b> (it's a power), so one day = quantity &times; hours of energy &mdash; e.g.
       50&nbsp;MW over 5&nbsp;h = 250&nbsp;MWh.</p>
     <div class="ctl" style="margin-bottom:14px">
-      <div class="fld"><label>Your position</label><select id="pos">
-        <option value="long" selected>LONG &mdash; surplus, TSO pays me the imbalance price</option>
-        <option value="short">SHORT &mdash; I sold it and can't deliver, I pay</option>
-      </select></div>
-      <div class="fld"><label>Quantity (MW, <b>held every hour</b>)</label><input type="number" id="qty" value="50" min="0" step="1"></div>
-      <div class="fld"><label>Market price (the leg you'd have traded at)</label>
+      <div class="fld"><label>Quantity in imbalance (MW, <b>every hour</b>)</label><input type="number" id="qty" value="50" min="0" step="1"></div>
+      <div class="fld"><label>What buying it back on IDM would cost you</label>
         <div class="row"><select id="saleMode">
-          <option value="da" selected>DAM day-ahead (real, per hour)</option>
-          <option value="fix">Fixed &mdash; type your IDM/contract price &rarr;</option>
-        </select><input type="number" id="salePx" value="100" min="-500" step="1" style="width:90px" disabled></div></div>
+          <option value="dap" selected>DAM + premium &rarr;</option>
+          <option value="da">DAM day-ahead exactly (low proxy)</option>
+          <option value="fix">Fixed IDM price &rarr;</option>
+        </select><input type="number" id="salePx" value="20" min="-500" step="1" style="width:80px"></div></div>
       <div class="fld"><label>Hours to include (local)</label>
         <div class="row"><select id="cHourFrom"></select><span style="color:var(--mut)">to</span><select id="cHourTo"></select></div></div>
       <div class="fld"><label>Quick hours</label>
@@ -135,7 +133,7 @@
       <div class="kpi big"><div class="lbl">Total (all days in range)</div><div class="val" id="cTot">--</div><div class="meta" id="cTotM"></div></div>
       <div class="kpi"><div class="lbl">Worst day</div><div class="val neg" id="cWorst">--</div><div class="meta" id="cWorstM"></div></div>
       <div class="kpi"><div class="lbl">Best day</div><div class="val pos" id="cBest">--</div><div class="meta" id="cBestM"></div></div>
-      <div class="kpi"><div class="lbl">Hours you win</div><div class="val" id="cWin">--</div><div class="meta" id="cWinM"></div></div>
+      <div class="kpi"><div class="lbl">Hours imbalance was cheaper</div><div class="val" id="cWin">--</div><div class="meta" id="cWinM"></div></div>
       <div class="kpi"><div class="lbl">Energy / delivery</div><div class="val" id="cEnergy">--</div><div class="meta" id="cEnergyM"></div></div>
     </div>
     <p class="note" style="margin:0 0 10px">Each row = one day = <b>one possible delivery</b>; cells are the P&amp;L for each hour
@@ -300,23 +298,20 @@ function recompute(){
   prof.update();
 
   // ---- P&L calculator: heatmap of every day x hour ----
-  // Both sides are the same spread, mirrored:
-  //   LONG  (surplus)          : TSO pays you imb instead of the market price you'd have got
-  //                              P&L per 15-min = (imb - market) * Q * 0.25h
-  //   SHORT (sold, no delivery): you got the market price, you buy back at imb
-  //                              P&L per 15-min = (market - imb) * Q * 0.25h
-  // Market price defaults to that hour's real day-ahead (DAM); ENTSO-E publishes no
-  // Serbian IDM series, so an IDM/contract price is entered manually as a fixed price.
+  // You are short and choose to ACCEPT the imbalance rather than buy it back on IDM.
+  // The sale price is banked either way, so it cancels; what moves money is
+  //   P&L per 15-min = (IDM buy-back price - imbalance price) * Q * 0.25h
+  // ENTSO-E publishes no Serbian IDM series, so the buy-back price is modelled as
+  // DAM + premium (default), plain DAM, or a fixed price the user types.
   const Q=+$('qty').value||0;
-  const isLong=$('pos').value==='long', side=isLong?1:-1;
-  const saleMode=$('saleMode').value, fixPx=+$('salePx').value||0;
-  $('salePx').disabled = saleMode!=='fix';
-  const SALE=r=>saleMode==='fix'?fixPx:DA(r);
+  const saleMode=$('saleMode').value, px=+$('salePx').value||0;
+  $('salePx').disabled = saleMode==='da';
+  const BUY=r=>saleMode==='fix'?px:(saleMode==='dap'?(DA(r)==null?null:DA(r)+px):DA(r));
   let cHf=+$('cHourFrom').value, cHt=+$('cHourTo').value; if(cHt<=cHf)cHt=cHf+1,$('cHourTo').value=cHt;
   const cWin=pad(cHf)+':00-'+pad(cHt)+':00';
   const cw=dsub.filter(r=>{const h=r[1]/4|0;return h>=cHf&&h<cHt;});   // calculator's own hours
-  const pInt=r=>{const p=IMB(r),s=SALE(r);
-    return (p==null||s==null)?null:side*(p-s)*Q*0.25;};   // EUR per 15-min
+  const pInt=r=>{const p=IMB(r),b=BUY(r);
+    return (p==null||b==null)?null:(b-p)*Q*0.25;};   // EUR per 15-min
   const hoursList=[]; for(let h=cHf;h<cHt;h++)hoursList.push(h);
   const dh={};                                   // di*100+h -> hour P&L EUR
   cw.forEach(r=>{const k=r[0]*100+(r[1]/4|0);dh[k]=(dh[k]||0)+(pInt(r)||0);});
@@ -332,8 +327,8 @@ function recompute(){
 
   $('cExp').innerHTML=expected==null?'--':eur(expected);
   $('cExp').className='val '+((expected||0)>=0?'pos':'neg');
-  $('cExpM').textContent='typical day \u00b7 '+(isLong?'LONG ':'SHORT ')+Q+' MW, '+cWin
-    +' \u00b7 vs '+(saleMode==='fix'?fixPx+' EUR/MWh':'DAM');
+  $('cExpM').textContent='typical day \u00b7 '+Q+' MW, '+cWin+' \u00b7 vs buy-back at '
+    +(saleMode==='fix'?px+' EUR/MWh':(saleMode==='dap'?'DAM+'+px:'DAM'));
   $('cWorst').innerHTML=worstD?eur(worstD.t):'--'; $('cWorstM').textContent=worstD?DATES[worstD.i]:'';
   $('cBest').innerHTML=bestD?eur(bestD.t):'--'; $('cBestM').textContent=bestD?DATES[bestD.i]:'';
   $('cEnergy').innerHTML=fmt(energyDel)+' <span class="un">MWh</span>';
@@ -345,8 +340,7 @@ function recompute(){
   dIdx.forEach(i=>hoursList.forEach(h=>{const v=dh[i*100+h];if(v!=null){cells++;if(v>0)winC++;}}));
   $('cWin').textContent=cells?Math.round(100*winC/cells)+'%':'--';
   $('cWin').className='val '+(winC?'pos':'');
-  $('cWinM').textContent=winC+' of '+cells+' hours where the imbalance price beat the market'
-    +(isLong?'':' the other way');
+  $('cWinM').textContent=winC+' of '+cells+' hours where imbalance beat buying it back';
 
   const heatBg=v=>{if(v==null)return 'transparent';
     const a=maxAbs?(0.12+0.8*Math.min(1,Math.abs(v)/maxAbs)):0.3;
