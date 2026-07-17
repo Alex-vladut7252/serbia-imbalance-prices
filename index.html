@@ -49,6 +49,9 @@
   .val.pos{color:var(--pos)} .val.neg{color:var(--neg)}
   .note{color:var(--mut);font-size:12px;margin-top:8px}
   b.pos{color:var(--pos)} b.neg{color:var(--neg)}
+  .fx{border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin:0 0 14px;background:#0d1520}
+  .fx code{font-size:15px;color:#e6edf3;display:block;line-height:1.6}
+  .fxn{color:var(--mut);font-size:13px;margin-top:6px}
   input[type=number]{width:140px}
   table{border-collapse:collapse;width:100%;font-size:13px}
   th,td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--bd)}
@@ -99,14 +102,13 @@
 
   <div class="card">
     <h2>Do these imbalances pay you, or do you pay them?</h2>
-    <p class="note" style="margin:0 0 12px">The amount is always <b>imbalance price &times; MW &times; hours</b>.
-      <b>Which way it goes depends on the direction:</b>
-      <b class="pos">system in surplus &rarr; the imbalance pays you (green, +)</b>;
-      <b class="neg">system in deficit &rarr; you pay it (red, &minus;)</b>.
-      Same size, opposite sign. This is the <b>same green/red</b> as the charts below, interval for interval &mdash;
-      every green quarter there is a quarter that pays you here.
-      <b>One day = one delivery</b>; the <b>same MW every chosen hour</b>, so 50&nbsp;MW over 5&nbsp;h
-      = 250&nbsp;MWh. Dates come from the filters above; headline numbers are a <b>typical (average) day</b>.</p>
+    <div class="fx">
+      <code>&euro; per quarter&nbsp; = &nbsp;imbalance price &nbsp;&times;&nbsp; MW &nbsp;&times;&nbsp; 0.25 h
+        &nbsp;&times;&nbsp; <b class="pos">(+1 surplus)</b> <span style="color:var(--mut)">or</span>
+        <b class="neg">(&minus;1 deficit)</b></code>
+      <div class="fxn"><b class="pos">Surplus &rarr; it pays you.</b>
+        <b class="neg">Deficit &rarr; you pay.</b> Same amount either way &mdash; only the sign flips.</div>
+    </div>
     <div class="ctl" style="margin-bottom:14px">
       <div class="fld"><label>Quantity in imbalance (MW, <b>every hour</b>)</label><input type="number" id="qty" value="50" min="0" step="1"></div>
       <div class="fld"><label>Hours to include (local)</label>
@@ -124,16 +126,11 @@
     <div class="kpis" style="margin-bottom:16px">
       <div class="kpi big"><div class="lbl">They pay you</div><div class="val pos" id="cPaid">--</div><div class="meta" id="cPaidM"></div></div>
       <div class="kpi big"><div class="lbl">You pay them</div><div class="val neg" id="cPays">--</div><div class="meta" id="cPaysM"></div></div>
-      <div class="kpi big"><div class="lbl">Net (all days in range)</div><div class="val" id="cTot">--</div><div class="meta" id="cTotM"></div></div>
-      <div class="kpi"><div class="lbl" id="cExpL">Net / typical day</div><div class="val" id="cExp">--</div><div class="meta" id="cExpM"></div></div>
+      <div class="kpi big"><div class="lbl">Net</div><div class="val" id="cTot">--</div><div class="meta" id="cTotM"></div></div>
       <div class="kpi"><div class="lbl" id="cWinL">Hours that pay you</div><div class="val" id="cWin">--</div><div class="meta" id="cWinM"></div></div>
-      <div class="kpi"><div class="lbl">Best day</div><div class="val pos" id="cBest">--</div><div class="meta" id="cBestM"></div></div>
-      <div class="kpi"><div class="lbl">Worst day</div><div class="val neg" id="cWorst">--</div><div class="meta" id="cWorstM"></div></div>
-      <div class="kpi"><div class="lbl">Energy / delivery</div><div class="val" id="cEnergy">--</div><div class="meta" id="cEnergyM"></div></div>
     </div>
-    <p class="note" style="margin:0 0 10px">Each row = one day = <b>one possible delivery</b>; cells are the P&amp;L for each hour
-      (EUR). <b class="pos">Green = that hour paid you</b> (surplus), <b class="neg">red = you paid</b> (deficit)
-      &mdash; darker = bigger. Last column = that day's net; bottom row = a <b>typical (average) day</b>.</p>
+    <p class="note" style="margin:0 0 10px">One row per day, one cell per hour, EUR.
+      <b class="pos">Green = paid you</b>, <b class="neg">red = you paid</b>. Last column = the day's net.</p>
     <div id="calcHeat" style="overflow-x:auto"></div>
   </div>
 
@@ -164,11 +161,27 @@
   </div>
 
   <div class="card">
-    <h2>Intraday profile &mdash; price and imbalance direction by time of day</h2>
+    <h2>One day &mdash; every quarter</h2>
+    <div class="ctl" style="margin-bottom:12px">
+      <div class="fld"><label>Day</label><select id="oneDay"></select></div>
+      <div class="fld"><label>Hours</label>
+        <div class="row"><select id="oneFrom"></select><span style="color:var(--mut)">to</span><select id="oneTo"></select></div></div>
+      <div class="fld"><label>Quick hours</label>
+        <div class="presets">
+          <button class="opreset" data-f="0" data-t="24">All day</button>
+          <button class="opreset" data-f="0" data-t="5">Night</button>
+          <button class="opreset" data-f="6" data-t="10">Morning</button>
+          <button class="opreset" data-f="10" data-t="16">Midday</button>
+          <button class="opreset" data-f="17" data-t="23">Evening</button>
+          <button class="opreset" data-f="18" data-t="22">Peak</button>
+        </div></div>
+    </div>
     <canvas id="prof"></canvas>
-    <p class="note">Amber line = average imbalance price (left axis). Bars = average system imbalance
-      (right axis): <b class="pos">green above zero = surplus, pays you</b>,
-      <b class="neg">red below zero = deficit, you pay</b>. Selected hours highlighted.</p>
+    <p class="note" id="oneNote"></p>
+    <p class="note">
+      One bar per <b>15-minute quarter</b> of the chosen day. Height = the imbalance price.
+      <b class="pos">Green = surplus, that quarter pays you</b>;
+      <b class="neg">red = deficit, you pay</b>. Hover for exact values.</p>
   </div>
 </div>
 <script>
@@ -199,6 +212,12 @@ const dirLine=v=>v==null?'#8b98a9':(v>=0?'#3fb950':'#f85149');
   for(let h=0;h<24;h++)cf.add(new Option(pad(h)+':00',h));
   for(let h=1;h<=24;h++)cto.add(new Option(pad(h)+':00',h));
   cf.value=17; cto.value=23;
+  // "One day - every quarter": its own day + hour window, default the latest full day
+  const od=$('oneDay'),of=$('oneFrom'),ot=$('oneTo');
+  DATES.forEach(d=>od.add(new Option(d,d)));
+  for(let h=0;h<24;h++)of.add(new Option(pad(h)+':00',h));
+  for(let h=1;h<=24;h++)ot.add(new Option(pad(h)+':00',h));
+  od.value='2026-07-15'; of.value=0; ot.value=24;
 })();
 
 const grid={color:'#2a3441'}, tick={color:'#8b98a9'};
@@ -209,13 +228,7 @@ const baseOpts=()=>({responsive:true,interaction:{mode:'index',intersect:false},
 const noLeg=()=>{const o=baseOpts();o.plugins.legend.display=false;return o;};
 const hourFocus=new Chart($('hourFocus'),{type:'bar',data:{labels:[],datasets:[]},options:noLeg()});
 const daily=new Chart($('daily'),{type:'bar',data:{labels:[],datasets:[]},options:noLeg()});
-const prof=new Chart($('prof'),{type:'bar',data:{labels:[],datasets:[]},options:{
-  responsive:true,interaction:{mode:'index',intersect:false},
-  scales:{x:{grid,ticks:tick},
-    y:{position:'left',grid,ticks:tick,title:{display:true,text:'Price EUR/MWh',color:'#8b98a9'}},
-    y1:{position:'right',grid:{drawOnChartArea:false},ticks:tick,
-        title:{display:true,text:'Imbalance MWh (+surplus / -deficit)',color:'#8b98a9'}}},
-  plugins:{legend:{labels:{color:'#e6edf3'}}}}});
+const prof=new Chart($('prof'),{type:'bar',data:{labels:[],datasets:[]},options:noLeg()});
 
 function recompute(){
   const s=$('startDate').value, e=$('endDate').value;
@@ -284,26 +297,25 @@ function recompute(){
     backgroundColor:dDir.map(dirFill),borderColor:dDir.map(dirLine),borderWidth:1.5}];
   daily.update();
 
-  // Intraday profile: price line + signed imbalance bars
-  const bySlot=Array.from({length:96},()=>[]); dsub.forEach(r=>bySlot[r[1]].push(r));
-  const slabels=bySlot.map((_,i)=>slotLbl(i));
-  const inWin=i=>{const h=i/4|0;return h>=hf&&h<ht;};
-  const priceSlot=bySlot.map(a=>mean(a.map(IMB)));
-  const volSlot=bySlot.map(a=>mean(a.map(SVOL)));
-  prof.data.labels=slabels;
-  prof.data.datasets=[
-    {type:'bar',label:'System imbalance (MWh)',yAxisID:'y1',data:volSlot,
-     backgroundColor:volSlot.map(v=>v==null?'#8b98a9':(v>=0?'#3fb95088':'#f8514988')),borderWidth:0},
-    {type:'line',label:'Imbalance price',yAxisID:'y',data:priceSlot,borderColor:'#f0b429',
-     backgroundColor:'#f0b42922',tension:.25,fill:false,
-     pointRadius:bySlot.map((_,i)=>inWin(i)?3.5:0),pointBackgroundColor:'#f0b429'}];
+  // One day, every quarter: one bar per 15-min slot of the chosen day + hours
+  const oneD=$('oneDay').value;
+  let oF=+$('oneFrom').value, oT=+$('oneTo').value; if(oT<=oF)oT=oF+1,$('oneTo').value=oT;
+  const oi=DATES.indexOf(oneD);
+  const oneRows=[];
+  for(let s=oF*4;s<oT*4;s++){const r=idxMap[oi*100+s]; if(r)oneRows.push(r);}
+  prof.data.labels=oneRows.map(r=>slotLbl(r[1]));
+  prof.data.datasets=[{label:'Imbalance price',data:oneRows.map(IMB),
+    backgroundColor:oneRows.map(r=>dirFill(DIR(r))),borderColor:oneRows.map(r=>dirLine(DIR(r))),borderWidth:1.5}];
   prof.update();
+  {const ps=oneRows.map(IMB).filter(v=>v!=null);
+   const np=oneRows.filter(r=>DIR(r)>0).length;
+   $('oneNote').innerHTML=ps.length
+     ? oneRows.length+' quarters on <b>'+oneD+'</b>, '+pad(oF)+':00-'+pad(oT)+':00 · average <b>'
+       +fmt(mean(ps))+' EUR/MWh</b> · <b class="pos">'+np+' pay you</b> · <b class="neg">'
+       +(oneRows.length-np)+' you pay</b>'
+     : 'No data for that day.';}
 
-  // ---- P&L calculator: heatmap of every day x hour ----
-  // You are short and choose to ACCEPT the imbalance rather than buy it back on IDM.
-  // The sale price is banked either way, so it cancels; what moves money is
-  //   P&L per 15-min = (IDM buy-back price - imbalance price) * Q * 0.25h
-  // ENTSO-E publishes no Serbian IDM series, so the buy-back price is typed by hand.
+  // ---- calculator: heatmap of every day x hour ----
   const Q=+$('qty').value||0;
   let cHf=+$('cHourFrom').value, cHt=+$('cHourTo').value; if(cHt<=cHf)cHt=cHf+1,$('cHourTo').value=cHt;
   const cWin=pad(cHf)+':00-'+pad(cHt)+':00';
@@ -323,17 +335,7 @@ function recompute(){
     hoursList.forEach(h=>{const v=dh[i*100+h];if(v!=null){t+=v;any=true;maxAbs=Math.max(maxAbs,Math.abs(v));}});
     if(any)dayTot.push({i,t});});
   const expected=dayTot.length?dayTot.reduce((s,d)=>s+d.t,0)/dayTot.length:null;
-  let worstD=null,bestD=null;
-  dayTot.forEach(d=>{if(worstD==null||d.t<worstD.t)worstD=d; if(bestD==null||d.t>bestD.t)bestD=d;});
-  const energyDel=Q*hoursList.length;            // MWh delivered in one interval (Q MW x hours)
 
-  $('cExp').innerHTML=expected==null?'--':eur(expected);
-  $('cExp').className='val '+((expected||0)>=0?'pos':'neg');
-  $('cExpM').textContent='typical day \u00b7 '+Q+' MW, '+cWin;
-  $('cWorst').innerHTML=worstD?eur(worstD.t):'--'; $('cWorstM').textContent=worstD?DATES[worstD.i]:'';
-  $('cBest').innerHTML=bestD?eur(bestD.t):'--'; $('cBestM').textContent=bestD?DATES[bestD.i]:'';
-  $('cEnergy').innerHTML=fmt(energyDel)+' <span class="un">MWh</span>';
-  $('cEnergyM').textContent=Q+' MW \u00d7 '+hoursList.length+' h';
   const total=dayTot.reduce((s,d)=>s+d.t,0);
   $('cTot').innerHTML=dayTot.length?eur(total):'--'; $('cTot').className='val '+((total||0)>=0?'pos':'neg');
   $('cTotM').textContent=dayTot.length+' days summed \u00b7 what they pay you minus what you pay';
@@ -347,7 +349,7 @@ function recompute(){
   $('cPaysM').textContent=(cells-winC)+' hours in deficit \u00b7 you paid';
   $('cWin').textContent=cells?Math.round(100*winC/cells)+'%':'--';
   $('cWin').className='val '+(winC?'pos':'');
-  $('cWinM').textContent=winC+' of '+cells+' hours the system was in surplus';
+  $('cWinM').textContent=winC+' of '+cells+' hours';
 
   const heatBg=v=>{if(v==null)return 'transparent';
     const a=maxAbs?(0.12+0.8*Math.min(1,Math.abs(v)/maxAbs)):0.3;
@@ -374,6 +376,10 @@ document.querySelectorAll('.presets button:not(.cpreset)').forEach(b=>b.addEvent
   $('hourFrom').value=b.dataset.f;$('hourTo').value=b.dataset.t;recompute();}));
 document.querySelectorAll('.cpreset').forEach(b=>b.addEventListener('click',()=>{
   $('cHourFrom').value=b.dataset.f;$('cHourTo').value=b.dataset.t;recompute();}));
+document.querySelectorAll('.opreset').forEach(b=>b.addEventListener('click',()=>{
+  $('oneFrom').value=b.dataset.f;$('oneTo').value=b.dataset.t;recompute();}));
+document.querySelectorAll('.opreset').forEach(b=>b.addEventListener('click',()=>{
+  $('oneFrom').value=b.dataset.f;$('oneTo').value=b.dataset.t;recompute();}));
 recompute();
 </script>
 </body></html>
