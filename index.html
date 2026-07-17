@@ -62,11 +62,18 @@
   td:first-child,th:first-child{text-align:left}
   td.win{color:var(--pos)} td.lose{color:var(--neg)}
   tbody tr:hover{background:var(--hov)}
+  #calcHeat{max-height:72vh;overflow:auto;border:1px solid var(--bd);border-radius:8px}
   #calcHeat td,#calcHeat th{font-size:11px;padding:4px 7px;white-space:nowrap}
-  #calcHeat tfoot td{border-top:2px solid var(--bd)}
+  #calcHeat thead th{position:sticky;top:0;background:var(--card);z-index:2}
+  #calcHeat thead th:first-child{z-index:3}
+  #calcHeat tfoot td{border-top:2px solid var(--bd);position:sticky;bottom:0;background:var(--card);z-index:2}
+  #calcHeat tfoot td:first-child{z-index:3}
+  #calcHeat tr.we td:first-child{color:var(--acc)}
+  #calcHeat td.dow{color:var(--dim);padding-right:4px}
+  #calcHeat td.paid{outline:1px solid var(--pos);outline-offset:-1px}
   input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
   @media(max-width:600px){body{padding:12px} .card{padding:14px} .ctl{gap:12px}}
-  #calcHeat td:first-child,#calcHeat th:first-child{position:sticky;left:0;background:var(--card)}
+  #calcHeat td:first-child,#calcHeat th:first-child{position:sticky;left:0;background:var(--card);z-index:1}
 </style></head>
 <body><div class="wrap">
   <h1>Serbian Imbalance Prices</h1>
@@ -146,14 +153,17 @@
       <div class="kpi"><div class="lbl">Net</div><div class="val" id="cTot">--</div><div class="meta" id="cTotM"></div></div>
     </div>
     <p class="note" style="margin:0 0 10px">One row per day, one cell per hour, EUR.
-      <b class="pos">Green = paid you</b>, <b class="neg">red = you paid</b>. Last column = the day's net.</p>
+      <b class="pos">Green (outlined) = paid you</b>, <b class="neg">red = you paid</b>, blank = price was
+      exactly 0.00. Green and red are shaded on <b>separate scales</b> &mdash; red cells run ~10&times; bigger,
+      so a shared scale made the paying cells nearly invisible. Weekends in <b style="color:var(--acc)">amber</b>.
+      Header and totals stay put as you scroll. Last column = the day's net.</p>
     <p class="note" style="border-left:2px solid var(--acc);padding-left:10px;margin:0 0 12px">
       <b>The totals assume you are short the whole time.</b> At 50&nbsp;MW across the full archive that is
       237,600&nbsp;MWh &mdash; never delivering, day and night, for 6.5 months. The entire Serbian system
       averages <b>27.2&nbsp;MWh</b> of imbalance per quarter, so that position would be ~46&nbsp;% of the
       country's imbalance every quarter for 199 days. It is a yardstick, not a forecast.
       <b>Per MWh is the number that transfers to a real position.</b></p>
-    <div id="calcHeat" style="overflow-x:auto"></div>
+    <div id="calcHeat"></div>
   </div>
 
   <div class="card">
@@ -388,9 +398,10 @@ function recompute(){
   const dh={};                                   // di*100+h -> hour P&L EUR
   cw.forEach(r=>{const k=r[0]*100+(r[1]/4|0);dh[k]=(dh[k]||0)+(pInt(r)||0);});
   // one row = one day over the chosen hours; each day's total is that day's settlement
-  let maxAbs=0; const dayTot=[];
+  let maxPos=0,maxNeg=0; const dayTot=[];
   dIdx.forEach(i=>{let t=0,any=false;
-    hoursList.forEach(h=>{const v=dh[i*100+h];if(v!=null){t+=v;any=true;maxAbs=Math.max(maxAbs,Math.abs(v));}});
+    hoursList.forEach(h=>{const v=dh[i*100+h];if(v!=null){t+=v;any=true;
+      if(v>0)maxPos=Math.max(maxPos,v); else maxNeg=Math.max(maxNeg,-v);}});
     if(any)dayTot.push({i,t});});
   const expected=dayTot.length?dayTot.reduce((s,d)=>s+d.t,0)/dayTot.length:null;
 
@@ -418,20 +429,28 @@ function recompute(){
   $('cWin').className='val '+(winC?'pos':'');
   $('cWinM').textContent=winC+' of '+cells+' hours · short '+Q+' MW';
 
-  // sqrt ramp: linear against maxAbs let one outlier saturate the scale and wash
-  // the mid-range out to near-invisible. sqrt keeps the extreme readable AND the
-  // ordinary cells distinguishable. Colour only -- the numbers are untouched.
-  const heatBg=v=>{if(v==null)return 'transparent';
-    const a=maxAbs?(0.10+0.85*Math.sqrt(Math.min(1,Math.abs(v)/maxAbs))):0.3;
-    return (v>=0?'rgba(63,185,80,':'rgba(248,81,73,')+a.toFixed(2)+')';};
+  // Green and red get INDEPENDENT ramps. Red cells run ~10x bigger than green
+  // (worst hour -39,593 EUR vs best +3,775), so a shared scale washed the paying
+  // cells out to alpha ~0.24 -- the 7% that matter, drowned by the 85% that don't.
+  // Each direction now spans its own full range. sqrt keeps extremes readable
+  // without flattening the middle. Colour only; the numbers are untouched.
+  const heatBg=v=>{if(v==null||v===0)return 'transparent';
+    const m=v>0?maxPos:maxNeg;
+    const a=m?(0.15+0.75*Math.sqrt(Math.min(1,Math.abs(v)/m))):0.3;
+    return (v>0?'rgba(63,185,80,':'rgba(248,81,73,')+a.toFixed(2)+')';};
+  const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dnum=d=>new Date(d+'T00:00:00Z').getUTCDay();
   const num=v=>v==null?'':Math.round(v).toLocaleString('en');
   let out='<table><thead><tr><th>Day</th>'+hoursList.map(h=>'<th>'+pad(h)+'h</th>').join('')
         +'<th>Day total</th></tr></thead><tbody>';
   dIdx.forEach(i=>{let rt=0,any=false,tds='';
     hoursList.forEach(h=>{const v=dh[i*100+h];if(v!=null){rt+=v;any=true;}
-      tds+='<td style="background:'+heatBg(v)+'" title="'+DATES[i]+' '+pad(h)+':00">'+num(v)+'</td>';});
-    out+='<tr><td>'+DATES[i]+'</td>'+tds+'<td class="'+(rt>=0?'win':'lose')+'"><b>'
-        +(any?num(rt):'')+'</b></td></tr>';});
+      const cls=v>0?' class="paid"':'';
+      tds+='<td'+cls+' style="background:'+heatBg(v)+'" title="'+DATES[i]+' '+pad(h)+':00'
+          +(v!=null?' · '+(v>0?'pays you ':'you pay ')+eur(v):'')+'">'+num(v)+'</td>';});
+    const wd=dnum(DATES[i]), we=(wd===0||wd===6);
+    out+='<tr'+(we?' class="we"':'')+'><td><span class="dow">'+DOW[wd]+'</span> '+DATES[i]+'</td>'+tds
+        +'<td class="'+(rt>=0?'win':'lose')+'"><b>'+(any?num(rt):'')+'</b></td></tr>';});
   out+='</tbody><tfoot><tr><td><b>Typical day (avg)</b></td>';
   hoursList.forEach(h=>{let sum=0,n=0;dIdx.forEach(i=>{const v=dh[i*100+h];if(v!=null){sum+=v;n++;}});
     const av=n?sum/n:null;
