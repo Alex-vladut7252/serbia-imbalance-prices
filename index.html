@@ -52,7 +52,6 @@
   .val.pos{color:var(--pos)} .val.neg{color:var(--neg)}
   .note{color:var(--mut);font-size:12px;margin-top:8px}
   b.pos{color:var(--pos)} b.neg{color:var(--neg)}
-  b.sur{color:var(--blue)} b.def{color:var(--dir2)}
   .fx{border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin:0 0 14px;background:var(--sunk)}
   .fx code{font-size:15px;color:var(--fg);display:block;line-height:1.6}
   .fxn{color:var(--mut);font-size:13px;margin-top:6px}
@@ -74,18 +73,22 @@
   <p class="sub">Control area 10YCS-SERBIATSOV &middot; 15-min settlement &middot; Europe/Belgrade time &middot;
      ENTSO-E docType A85 (price) + A86 (direction). Serbia runs a <b>single imbalance price</b>.</p>
   <p class="sub" style="border:1px solid var(--bd);border-radius:8px;padding:10px 12px;background:var(--sunk)">
-     <b>Two different things get called "deficit". Keep them apart.</b>
-     <b class="sur">The SYSTEM's direction</b> (surplus/deficit, from A86) is what the grid was doing &mdash;
-     charts show it in <b class="sur">blue</b>/<b class="def">orange</b>, and it <b>never enters your
-     settlement</b>. <b>YOUR position</b> (short = you delivered less than you sold) is the only thing that does.
-     You are paid whenever <b>your sign is opposite to the price's sign</b> &mdash;
-     <b class="pos">green</b>/<b class="neg">red</b>, calculator only.
-     In Serbia the price sign tells you <b>nothing</b> about the system's direction: of 310 negative prices
-     between 1 Jun and 17 Jul 2026, <b>147 were in surplus and 163 in deficit</b>.</p>
+     <b>Every colour on this page means one thing: your money.</b>
+     <b class="pos">Green = that quarter pays you.</b> <b class="neg">Red = you pay.</b>
+     <b style="color:var(--dim)">Grey = the price was exactly 0.00, so nothing changes hands.</b>
+     It follows from <b>your position</b> (set above) against the <b>price's sign</b>: you are paid whenever the
+     two are opposite. Flip short&harr;long and every colour flips with it.
+     The system's own surplus/deficit is <b>not</b> shown, because it does not affect your settlement and its
+     sign does not track the price's &mdash; of 310 negative prices between 1 Jun and 17 Jul 2026,
+     <b>147 happened in surplus and 163 in deficit</b>.</p>
 
   <div class="card">
     <h2>Filters</h2>
     <div class="ctl">
+      <div class="fld"><label>Your position &mdash; colours the whole page</label><select id="pos">
+        <option value="-1" selected>Short &mdash; I sold it and couldn't deliver</option>
+        <option value="1">Long &mdash; I delivered more than I sold</option>
+      </select></div>
       <div class="fld"><label>From date</label><input type="date" id="startDate" min="2025-12-30" max="2026-07-16" value="2026-07-02"></div>
       <div class="fld"><label>To date</label><input type="date" id="endDate" min="2025-12-30" max="2026-07-16" value="2026-07-15"></div>
       <div class="fld"><label>Hour window (local)</label>
@@ -118,13 +121,10 @@
         Long = you delivered more &rarr; <b class="pos">positive</b>.
         50&nbsp;MW for a quarter = 12.5&nbsp;MWh.
         <br>The <b>system's</b> surplus/deficit is <b>not</b> in this formula and never affects your money
-        &mdash; only your own position does.</div>
+        &mdash; only your own position does. Set your position in the <b>Filters</b> at the top; it colours
+        every chart on this page.</div>
     </div>
     <div class="ctl" style="margin-bottom:14px">
-      <div class="fld"><label>Your position</label><select id="pos">
-        <option value="-1" selected>Short &mdash; I sold it and couldn't deliver</option>
-        <option value="1">Long &mdash; I delivered more than I sold</option>
-      </select></div>
       <div class="fld"><label>Quantity in imbalance (MW, <b>every hour</b>)</label><input type="number" id="qty" value="50" min="0" step="1"></div>
       <div class="fld"><label>Hours to include (local)</label>
         <div class="row"><select id="cHourFrom"></select><span style="color:var(--mut)">to</span><select id="cHourTo"></select></div></div>
@@ -162,18 +162,15 @@
     <canvas id="hourFocus"></canvas>
     <p class="note" id="focusNote"></p>
     <p class="note">Four bars per day = <b>:00 / :15 / :30 / :45</b> (left&rarr;right; hover for exact
-      values). Bar height = the <b>imbalance price</b>. Colour = what the <b>system</b> was doing:
-      <b class="sur">blue = surplus</b>, <b class="def">orange = deficit</b>. That is context only &mdash;
-      it does <b>not</b> decide your money. Your money is decided by the <b>price sign</b> against
-      <b>your own position</b>, in the calculator above.</p>
+      values). Bar height = the <b>imbalance price</b>; colour = <b class="pos">it pays you</b> /
+      <b class="neg">you pay</b>, for your position.</p>
   </div>
 
   <div class="card">
     <h2 id="dailyTitle">Average imbalance price per day within window</h2>
     <canvas id="daily"></canvas>
     <p class="note">Bar height = average imbalance price for the day (EUR/MWh); bar colour = that day's net
-      imbalance direction (<b class="sur">blue = surplus</b>, <b class="def">orange = deficit</b>)
-      &mdash; context, not money.</p>
+      money for that day (<b class="pos">green = paid you</b>, <b class="neg">red = you paid</b>).</p>
   </div>
 
   <div class="card">
@@ -195,9 +192,9 @@
     <canvas id="prof"></canvas>
     <p class="note" id="oneNote"></p>
     <p class="note">
-      One bar per <b>15-minute quarter</b> of the chosen day. Height = the imbalance price.
-      <b class="sur">Blue = the system was in surplus</b>, <b class="def">orange = deficit</b> &mdash;
-      context, not money. Hover for exact values.</p>
+      One bar per <b>15-minute quarter</b> of the chosen day. Height = the imbalance price;
+      <b class="pos">green = that quarter pays you</b>, <b class="neg">red = you pay</b>.
+      Hover for exact values.</p>
   </div>
 </div>
 <script>
@@ -213,13 +210,15 @@ const IMB=r=>r[2], SVOL=r=>r[3], DIR=r=>r[4];
 // Never infer the sign from SVOL: -0.0 >= 0 is true in JS and flips a deficit to surplus.
 function mean(a){a=a.filter(v=>v!=null&&!isNaN(v));return a.length?a.reduce((x,y)=>x+y,0)/a.length:null;}
 // direction colouring from signed imbalance: + surplus (green), - deficit (red)
-// The SYSTEM's direction is independent of your money and must never share the
-// money palette: 84% of surplus quarters still settle at a positive price, and a
-// Serbian negative price is as likely to occur in deficit as in surplus. Blue =
-// surplus, orange = deficit -- informational only. Green/red means money, and
-// money lives only in the calculator.
-const dirFill=v=>v==null?'#8b98a988':(v>=0?'#58a6ff99':'#f0883e99');
-const dirLine=v=>v==null?'#8b98a9':(v>=0?'#58a6ff':'#f0883e');
+// ONE colour meaning on the whole page: money, for YOUR position.
+// m = POS * price. m>0 you are paid (green), m<0 you pay (red), m==0 nothing
+// changes hands (grey -- 8.2% of quarters settle at exactly 0.00, and that is a
+// real outcome, not a gap).
+// The system's surplus/deficit does NOT colour anything: it does not enter
+// settlement and its sign does not track the price's, so colouring by it would
+// tell you the opposite of your money roughly half the time.
+const mFill=m=>m==null?'#8b98a988':(m===0?'#8b98a988':(m>0?'#3fb95099':'#f8514999'));
+const mLine=m=>m==null?'#8b98a9':(m===0?'#8b98a9':(m>0?'#3fb950':'#f85149'));
 
 (function init(){
   const hf=$('hourFrom'),ht=$('hourTo'),fh=$('focusHour');
@@ -249,6 +248,8 @@ const daily=new Chart($('daily'),{type:'bar',data:{labels:[],datasets:[]},option
 const prof=new Chart($('prof'),{type:'bar',data:{labels:[],datasets:[]},options:noLeg()});
 
 function recompute(){
+  const POS=+$('pos').value;        // -1 short, +1 long -- drives every colour on the page
+  const MONEY=r=>{const p=IMB(r);return p==null?null:POS*p;};   // sign of your settlement
   const s=$('startDate').value, e=$('endDate').value;
   let hf=+$('hourFrom').value, ht=+$('hourTo').value; if(ht<=hf)ht=hf+1,$('hourTo').value=ht;
   const fH=+$('focusHour').value;
@@ -293,13 +294,13 @@ function recompute(){
     hourFocus.data.datasets=[0,1,2,3].map(q=>({
       label:pad(fH)+':'+pad(q*15),
       data:dIdx.map(i=>{const r=idxMap[i*100+fH*4+q];return r?IMB(r):null;}),
-      backgroundColor:dIdx.map(i=>{const r=idxMap[i*100+fH*4+q];return dirFill(r?DIR(r):null);}),
-      borderColor:dIdx.map(i=>{const r=idxMap[i*100+fH*4+q];return dirLine(r?DIR(r):null);}),
+      backgroundColor:dIdx.map(i=>{const r=idxMap[i*100+fH*4+q];return mFill(r?MONEY(r):null);}),
+      borderColor:dIdx.map(i=>{const r=idxMap[i*100+fH*4+q];return mLine(r?MONEY(r):null);}),
       borderWidth:1}));
   }else{
-    const hourDir=dIdx.map(i=>{const vs=[0,1,2,3].map(q=>idxMap[i*100+fH*4+q]).filter(Boolean).map(DIR);return mean(vs);});
+    const hourDir=dIdx.map(i=>{const vs=[0,1,2,3].map(q=>idxMap[i*100+fH*4+q]).filter(Boolean).map(MONEY);return mean(vs);});
     hourFocus.data.datasets=[{label:pad(fH)+':00 avg',data:hourAvg,
-      backgroundColor:hourDir.map(dirFill),borderColor:hourDir.map(dirLine),borderWidth:1.5}];
+      backgroundColor:hourDir.map(mFill),borderColor:hourDir.map(mLine),borderWidth:1.5}];
   }
   hourFocus.update();
   $('focusNote').textContent='Imbalance price at '+pad(fH)+':00 across '+dlabels.length
@@ -310,9 +311,9 @@ function recompute(){
   $('dailyTitle').textContent='Average imbalance price per day within '+winTxt;
   daily.data.labels=dlabels;
   const dPrice=dIdx.map(i=>byDate[i]?mean(byDate[i].map(IMB)):null);
-  const dDir=dIdx.map(i=>byDate[i]?mean(byDate[i].map(DIR)):null);
+  const dDir=dIdx.map(i=>byDate[i]?mean(byDate[i].map(MONEY)):null);
   daily.data.datasets=[{label:'avg price',data:dPrice,
-    backgroundColor:dDir.map(dirFill),borderColor:dDir.map(dirLine),borderWidth:1.5}];
+    backgroundColor:dDir.map(mFill),borderColor:dDir.map(mLine),borderWidth:1.5}];
   daily.update();
 
   // One day, every quarter: one bar per 15-min slot of the chosen day + hours
@@ -323,14 +324,14 @@ function recompute(){
   for(let s=oF*4;s<oT*4;s++){const r=idxMap[oi*100+s]; if(r)oneRows.push(r);}
   prof.data.labels=oneRows.map(r=>slotLbl(r[1]));
   prof.data.datasets=[{label:'Imbalance price',data:oneRows.map(IMB),
-    backgroundColor:oneRows.map(r=>dirFill(DIR(r))),borderColor:oneRows.map(r=>dirLine(DIR(r))),borderWidth:1.5}];
+    backgroundColor:oneRows.map(r=>mFill(MONEY(r))),borderColor:oneRows.map(r=>mLine(MONEY(r))),borderWidth:1.5}];
   prof.update();
   {const ps=oneRows.map(IMB).filter(v=>v!=null);
-   const np=oneRows.filter(r=>DIR(r)>0).length;
+   const np=oneRows.filter(r=>MONEY(r)>0).length;
    $('oneNote').innerHTML=ps.length
      ? oneRows.length+' quarters on <b>'+oneD+'</b>, '+pad(oF)+':00-'+pad(oT)+':00 · average <b>'
        +fmt(mean(ps))+' EUR/MWh</b> · <b class="pos">'+np+' pay you</b> · <b class="neg">'
-       +(oneRows.length-np)+' you pay</b>'
+       +(oneRows.length-np)+' you pay or settle at zero</b>'
      : 'No data for that day.';}
 
   // ---- calculator: heatmap of every day x hour ----
@@ -346,13 +347,12 @@ function recompute(){
   // grid short?" -- a different question -- and is wrong ~half the time, because
   // Serbian price signs carry no direction information (147 LONG vs 163 SHORT
   // negatives, 1 Jun - 17 Jul 2026).
-  const POS=+$('pos').value;                       // -1 short, +1 long
   const pInt=r=>{const p=IMB(r);
     return p==null?null:POS*Q*0.25*p;};            // EUR per 15-min
   const hoursList=[]; for(let h=cHf;h<cHt;h++)hoursList.push(h);
   const dh={};                                   // di*100+h -> hour P&L EUR
   cw.forEach(r=>{const k=r[0]*100+(r[1]/4|0);dh[k]=(dh[k]||0)+(pInt(r)||0);});
-  // one delivery = one day over the chosen hours; each day's total is that delivery's P&L
+  // one row = one day over the chosen hours; each day's total is that day's settlement
   let maxAbs=0; const dayTot=[];
   dIdx.forEach(i=>{let t=0,any=false;
     hoursList.forEach(h=>{const v=dh[i*100+h];if(v!=null){t+=v;any=true;maxAbs=Math.max(maxAbs,Math.abs(v));}});
@@ -381,8 +381,8 @@ function recompute(){
     const a=maxAbs?(0.10+0.85*Math.sqrt(Math.min(1,Math.abs(v)/maxAbs))):0.3;
     return (v>=0?'rgba(63,185,80,':'rgba(248,81,73,')+a.toFixed(2)+')';};
   const num=v=>v==null?'':Math.round(v).toLocaleString('en');
-  let out='<table><thead><tr><th>Day (one delivery)</th>'+hoursList.map(h=>'<th>'+pad(h)+'h</th>').join('')
-        +'<th>Delivery P&amp;L</th></tr></thead><tbody>';
+  let out='<table><thead><tr><th>Day</th>'+hoursList.map(h=>'<th>'+pad(h)+'h</th>').join('')
+        +'<th>Day total</th></tr></thead><tbody>';
   dIdx.forEach(i=>{let rt=0,any=false,tds='';
     hoursList.forEach(h=>{const v=dh[i*100+h];if(v!=null){rt+=v;any=true;}
       tds+='<td style="background:'+heatBg(v)+'" title="'+DATES[i]+' '+pad(h)+':00">'+num(v)+'</td>';});
