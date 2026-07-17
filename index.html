@@ -20,7 +20,7 @@
 <style>
   :root{--bg:#0f1419;--card:#1a2230;--pan:#141b26;--sunk:#0d1520;--hov:#1e2937;
         --fg:#e6edf3;--mut:#a3b1c2;--dim:#8b98a9;
-        --acc:#f0b429;--pos:#3fb950;--neg:#f85149;--blue:#58a6ff;--bd:#2a3441}
+        --acc:#f0b429;--pos:#3fb950;--neg:#f85149;--blue:#58a6ff;--dir2:#f0883e;--bd:#2a3441}
   *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);
     font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;padding:24px}
   h1{font-size:22px;margin:0 0 2px} .sub{color:var(--mut);margin:0 0 18px;font-size:13px;max-width:1160px}
@@ -52,6 +52,7 @@
   .val.pos{color:var(--pos)} .val.neg{color:var(--neg)}
   .note{color:var(--mut);font-size:12px;margin-top:8px}
   b.pos{color:var(--pos)} b.neg{color:var(--neg)}
+  b.sur{color:var(--blue)} b.def{color:var(--dir2)}
   .fx{border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin:0 0 14px;background:var(--sunk)}
   .fx code{font-size:15px;color:var(--fg);display:block;line-height:1.6}
   .fxn{color:var(--mut);font-size:13px;margin-top:6px}
@@ -73,11 +74,14 @@
   <p class="sub">Control area 10YCS-SERBIATSOV &middot; 15-min settlement &middot; Europe/Belgrade time &middot;
      ENTSO-E docType A85 (price) + A86 (direction). Serbia runs a <b>single imbalance price</b>.</p>
   <p class="sub" style="border:1px solid var(--bd);border-radius:8px;padding:10px 12px;background:var(--sunk)">
-     <b>One colour scale, everywhere on this page.</b>
-     <b class="pos">Green = the system was in surplus &rarr; the imbalance pays you.</b>
-     <b class="neg">Red = the system was in deficit &rarr; you pay it.</b>
-     The amount is the same either way (<b>price &times; MW &times; hours</b>) &mdash; only the sign changes.
-     Every green quarter on the charts is a quarter that <b>pays you</b> in the calculator.</p>
+     <b>Two different things get called "deficit". Keep them apart.</b>
+     <b class="sur">The SYSTEM's direction</b> (surplus/deficit, from A86) is what the grid was doing &mdash;
+     charts show it in <b class="sur">blue</b>/<b class="def">orange</b>, and it <b>never enters your
+     settlement</b>. <b>YOUR position</b> (short = you delivered less than you sold) is the only thing that does.
+     You are paid whenever <b>your sign is opposite to the price's sign</b> &mdash;
+     <b class="pos">green</b>/<b class="neg">red</b>, calculator only.
+     In Serbia the price sign tells you <b>nothing</b> about the system's direction: of 310 negative prices
+     between 1 Jun and 17 Jul 2026, <b>147 were in surplus and 163 in deficit</b>.</p>
 
   <div class="card">
     <h2>Filters</h2>
@@ -108,13 +112,19 @@
   <div class="card">
     <h2>Do these imbalances pay you, or do you pay them?</h2>
     <div class="fx">
-      <code>&euro; per quarter&nbsp; = &nbsp;imbalance price &nbsp;&times;&nbsp; MW &nbsp;&times;&nbsp; 0.25 h
-        &nbsp;&times;&nbsp; <b class="pos">(+1 surplus)</b> <span style="color:var(--mut)">or</span>
-        <b class="neg">(&minus;1 deficit)</b></code>
-      <div class="fxn"><b class="pos">Surplus &rarr; it pays you.</b>
-        <b class="neg">Deficit &rarr; you pay.</b> Same amount either way &mdash; only the sign flips.</div>
+      <code><b>your signed volume (MWh)</b> &nbsp;&times;&nbsp; <b>imbalance price</b> &nbsp;=&nbsp; settlement</code>
+      <div class="fxn"><b>You are paid whenever your sign is the opposite of the price's sign.</b>
+        Short = you delivered less than you sold &rarr; your volume is <b class="neg">negative</b>.
+        Long = you delivered more &rarr; <b class="pos">positive</b>.
+        50&nbsp;MW for a quarter = 12.5&nbsp;MWh.
+        <br>The <b>system's</b> surplus/deficit is <b>not</b> in this formula and never affects your money
+        &mdash; only your own position does.</div>
     </div>
     <div class="ctl" style="margin-bottom:14px">
+      <div class="fld"><label>Your position</label><select id="pos">
+        <option value="-1" selected>Short &mdash; I sold it and couldn't deliver</option>
+        <option value="1">Long &mdash; I delivered more than I sold</option>
+      </select></div>
       <div class="fld"><label>Quantity in imbalance (MW, <b>every hour</b>)</label><input type="number" id="qty" value="50" min="0" step="1"></div>
       <div class="fld"><label>Hours to include (local)</label>
         <div class="row"><select id="cHourFrom"></select><span style="color:var(--mut)">to</span><select id="cHourTo"></select></div></div>
@@ -152,17 +162,18 @@
     <canvas id="hourFocus"></canvas>
     <p class="note" id="focusNote"></p>
     <p class="note">Four bars per day = <b>:00 / :15 / :30 / :45</b> (left&rarr;right; hover for exact
-      values). Bar height = the <b>imbalance price</b> (the amount at stake).
-      <b class="pos">Green = surplus &rarr; that quarter pays you</b>;
-      <b class="neg">red = deficit &rarr; you pay it</b>. A tall green bar is a big quarter <i>in your favour</i>.</p>
+      values). Bar height = the <b>imbalance price</b>. Colour = what the <b>system</b> was doing:
+      <b class="sur">blue = surplus</b>, <b class="def">orange = deficit</b>. That is context only &mdash;
+      it does <b>not</b> decide your money. Your money is decided by the <b>price sign</b> against
+      <b>your own position</b>, in the calculator above.</p>
   </div>
 
   <div class="card">
     <h2 id="dailyTitle">Average imbalance price per day within window</h2>
     <canvas id="daily"></canvas>
     <p class="note">Bar height = average imbalance price for the day (EUR/MWh); bar colour = that day's net
-      imbalance direction (<b class="pos">green = surplus, pays you</b>,
-      <b class="neg">red = deficit, you pay</b>).</p>
+      imbalance direction (<b class="sur">blue = surplus</b>, <b class="def">orange = deficit</b>)
+      &mdash; context, not money.</p>
   </div>
 
   <div class="card">
@@ -185,8 +196,8 @@
     <p class="note" id="oneNote"></p>
     <p class="note">
       One bar per <b>15-minute quarter</b> of the chosen day. Height = the imbalance price.
-      <b class="pos">Green = surplus, that quarter pays you</b>;
-      <b class="neg">red = deficit, you pay</b>. Hover for exact values.</p>
+      <b class="sur">Blue = the system was in surplus</b>, <b class="def">orange = deficit</b> &mdash;
+      context, not money. Hover for exact values.</p>
   </div>
 </div>
 <script>
@@ -202,11 +213,13 @@ const IMB=r=>r[2], SVOL=r=>r[3], DIR=r=>r[4];
 // Never infer the sign from SVOL: -0.0 >= 0 is true in JS and flips a deficit to surplus.
 function mean(a){a=a.filter(v=>v!=null&&!isNaN(v));return a.length?a.reduce((x,y)=>x+y,0)/a.length:null;}
 // direction colouring from signed imbalance: + surplus (green), - deficit (red)
-// Direction IS the money: a surplus imbalance pays you, a deficit one you pay.
-// So green = surplus = paid, red = deficit = you pay -- and the calculator uses
-// the exact same scale, so every view on the page agrees interval by interval.
-const dirFill=v=>v==null?'#8b98a988':(v>=0?'#3fb95099':'#f8514999');
-const dirLine=v=>v==null?'#8b98a9':(v>=0?'#3fb950':'#f85149');
+// The SYSTEM's direction is independent of your money and must never share the
+// money palette: 84% of surplus quarters still settle at a positive price, and a
+// Serbian negative price is as likely to occur in deficit as in surplus. Blue =
+// surplus, orange = deficit -- informational only. Green/red means money, and
+// money lives only in the calculator.
+const dirFill=v=>v==null?'#8b98a988':(v>=0?'#58a6ff99':'#f0883e99');
+const dirLine=v=>v==null?'#8b98a9':(v>=0?'#58a6ff':'#f0883e');
 
 (function init(){
   const hf=$('hourFrom'),ht=$('hourTo'),fh=$('focusHour');
@@ -325,12 +338,17 @@ function recompute(){
   let cHf=+$('cHourFrom').value, cHt=+$('cHourTo').value; if(cHt<=cHf)cHt=cHf+1,$('cHourTo').value=cHt;
   const cWin=pad(cHf)+':00-'+pad(cHt)+':00';
   const cw=dsub.filter(r=>{const h=r[1]/4|0;return h>=cHf&&h<cHt;});   // calculator's own hours
-  // Amount is always price x MW x hours; the DIRECTION decides the sign.
-  //   DIR +1 surplus -> the imbalance pays you
-  //   DIR -1 deficit -> you pay it
-  // Same scale as dirFill/dirLine, so the heatmap and the charts agree cell for bar.
-  const pInt=r=>{const p=IMB(r),s=DIR(r);
-    return (p==null||s==null)?null:s*p*Q*0.25;};     // EUR per 15-min
+  // Settlement = YOUR signed volume (MWh) x price. Nothing else.
+  //   short -> volume negative, long -> volume positive; you are paid whenever
+  //   your sign is opposite to the price's sign.
+  // The SYSTEM's direction (DIR, from A86) is deliberately absent: under Serbia's
+  // single price it never enters settlement. Multiplying by it answers "was the
+  // grid short?" -- a different question -- and is wrong ~half the time, because
+  // Serbian price signs carry no direction information (147 LONG vs 163 SHORT
+  // negatives, 1 Jun - 17 Jul 2026).
+  const POS=+$('pos').value;                       // -1 short, +1 long
+  const pInt=r=>{const p=IMB(r);
+    return p==null?null:POS*Q*0.25*p;};            // EUR per 15-min
   const hoursList=[]; for(let h=cHf;h<cHt;h++)hoursList.push(h);
   const dh={};                                   // di*100+h -> hour P&L EUR
   cw.forEach(r=>{const k=r[0]*100+(r[1]/4|0);dh[k]=(dh[k]||0)+(pInt(r)||0);});
@@ -354,7 +372,7 @@ function recompute(){
   $('cPaysM').textContent=(cells-winC)+' hours in deficit \u00b7 you paid';
   $('cWin').textContent=cells?Math.round(100*winC/cells)+'%':'--';
   $('cWin').className='val '+(winC?'pos':'');
-  $('cWinM').textContent=winC+' of '+cells+' hours';
+  $('cWinM').textContent=winC+' of '+cells+' hours · '+(POS<0?'short':'long')+' '+Q+' MW';
 
   // sqrt ramp: linear against maxAbs let one outlier saturate the scale and wash
   // the mid-range out to near-invisible. sqrt keeps the extreme readable AND the
