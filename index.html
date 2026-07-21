@@ -181,6 +181,33 @@
   </div>
 
   <div class="card">
+    <h2>Guarantee ledger &mdash; day by day, cumulative (continuity)</h2>
+    <div class="ctl" style="margin-bottom:14px">
+      <div class="fld"><label>Guarantee (&euro;)</label><input type="number" id="lguar" value="40000" min="0" step="1000"></div>
+      <div class="fld"><label>Imbalance (MW short)</label><input type="number" id="lmw" value="50" min="0" step="1"></div>
+      <div class="fld"><label>Hours (local)</label>
+        <div class="row"><select id="lFrom"></select><span style="color:var(--mut)">to</span><select id="lTo"></select></div></div>
+      <div class="fld"><label>Quick hours</label>
+        <div class="presets">
+          <button class="lpreset" data-f="18" data-t="22">Peak 18-22</button>
+          <button class="lpreset" data-f="18" data-t="23">Evening 18-23</button>
+          <button class="lpreset" data-f="0" data-t="24">All day</button>
+        </div></div>
+    </div>
+    <div class="kpis" style="margin-bottom:16px">
+      <div class="kpi big"><div class="lbl">Guarantee lasts</div><div class="val neg" id="lDays">--</div><div class="meta" id="lDaysM"></div></div>
+      <div class="kpi"><div class="lbl">Net over range</div><div class="val" id="lNet">--</div><div class="meta" id="lNetM"></div></div>
+      <div class="kpi"><div class="lbl">Total paid</div><div class="val neg" id="lLost">--</div><div class="meta" id="lLostM"></div></div>
+      <div class="kpi"><div class="lbl">Total received</div><div class="val pos" id="lWon">--</div><div class="meta" id="lWonM"></div></div>
+      <div class="kpi"><div class="lbl">Worst day</div><div class="val neg" id="lWorst">--</div><div class="meta" id="lWorstM"></div></div>
+    </div>
+    <div id="lTable" style="overflow:auto;max-height:60vh;border:1px solid var(--bd);border-radius:8px"></div>
+    <p class="note">Real days, in order, at your MW and hours. <b>Day P&amp;L</b> = &minus;MW &times; 0.25h &times; price per
+      quarter, summed (price positive &rarr; you pay, negative &rarr; credited). <b>Cumulative</b> runs the total; <b>Guarantee
+      left</b> = guarantee + cumulative. Where it goes red, the collateral is used up. Follows the date range up top.</p>
+  </div>
+
+  <div class="card">
     <h2>When do you get paid?</h2>
     <div class="kpis" style="margin-bottom:16px">
       <div class="kpi big"><div class="lbl">They pay you</div><div class="val pos" id="sPaid">--</div><div class="meta" id="sPaidM"></div></div>
@@ -283,6 +310,10 @@ const mLine=m=>m==null?'#8b98a9':(m===0?'#8b98a9':(m>0?'#3fb950':'#f85149'));
   for(let h=0;h<24;h++)of.add(new Option(pad(h)+':00',h));
   for(let h=1;h<=24;h++)ot.add(new Option(pad(h)+':00',h));
   od.value='2026-07-15'; of.value=0; ot.value=24;
+  const lf=$('lFrom'),lt=$('lTo');
+  for(let h=0;h<24;h++)lf.add(new Option(pad(h)+':00',h));
+  for(let h=1;h<=24;h++)lt.add(new Option(pad(h)+':00',h));
+  lf.value=18; lt.value=22;
 })();
 
 const grid={color:'#2a3441'}, tick={color:'#a3b1c2'};
@@ -532,19 +563,47 @@ function recompute(){
   });
   bt+='</tbody></table>';
   $('blockTable').innerHTML=bt;
+  // ---- guarantee ledger: continuous day-by-day cumulative running balance ----
+  const LG=+$('lguar').value||0, LMW=+$('lmw').value||0;
+  let lfh=+$('lFrom').value, lth=+$('lTo').value; if(lth<=lfh)lth=lfh+1,$('lTo').value=lth;
+  const led={};
+  dsub.forEach(r=>{const h=r[1]/4|0; if(h<lfh||h>=lth)return; const p=IMB(r); if(p==null)return;
+    led[r[0]]=(led[r[0]]||0)-LMW*0.25*p;});   // short P&L: -MW*0.25*price
+  let cum=0, exh=null, daysLast=null, lost=0, won=0, worstV=null, worstD=null, nrows=0;
+  let lt2='<table><thead><tr><th>Date</th><th>Day P&amp;L</th><th>Cumulative</th><th>Guarantee left</th></tr></thead><tbody>';
+  dIdx.forEach(i=>{if(led[i]==null)return; const v=led[i]; cum+=v; const left=LG+cum; nrows++;
+    if(v<0)lost+=v; else won+=v;
+    if(worstV==null||v<worstV){worstV=v;worstD=i;}
+    if(exh==null&&left<=0){exh=DATES[i];daysLast=nrows;}
+    lt2+='<tr><td>'+DATES[i]+'</td><td class="'+(v>=0?'win':'lose')+'">'+eur(v)+'</td>'
+      +'<td>'+eur(cum)+'</td><td class="'+(left>=0?'win':'lose')+'"><b>'+eur(left)+'</b></td></tr>';});
+  lt2+='</tbody></table>';
+  $('lTable').innerHTML=nrows?lt2:'<p class="note" style="padding:10px">No data in range.</p>';
+  $('lDays').innerHTML=exh?daysLast+' <span class="un">days</span>':'&infin;';
+  $('lDaysM').textContent=exh?'used up on '+exh:(nrows?'survives all '+nrows+' days in range':'');
+  $('lDays').className='val '+(exh?'neg':'pos');
+  $('lNet').innerHTML=nrows?eur(cum):'--'; $('lNet').className='val '+(cum>=0?'pos':'neg');
+  $('lNetM').textContent=nrows?nrows+' days, '+LMW+' MW, '+pad(lfh)+'-'+pad(lth)+'h':'';
+  $('lLost').innerHTML=nrows?eur(lost):'--';
+  $('lLostM').textContent=nrows?'days you paid':'';
+  $('lWon').innerHTML=nrows?eur(won):'--';
+  $('lWonM').textContent=nrows?'days you were credited':'';
+  $('lWorst').innerHTML=worstV==null?'--':eur(worstV);
+  $('lWorstM').textContent=worstD!=null?DATES[worstD]:'';
   syncPresets();
 }
 
 document.querySelectorAll('input,select').forEach(el=>el.addEventListener('change',recompute));
 $('qty').addEventListener('input',recompute);
-['guar','gmw'].forEach(id=>$(id).addEventListener('input',recompute));
+['guar','gmw','lguar','lmw'].forEach(id=>$(id).addEventListener('input',recompute));
 // Each preset row drives ONLY its own card. ':not(.cpreset):not(.opreset)' matters:
 // the calculator and one-day rows live inside .presets too, so a bare
 // '.presets button' would make their buttons also move the top filter.
 const PRESETS=[['.presets button:not(.cpreset):not(.opreset):not(.gpreset)','hourFrom','hourTo'],
                ['.cpreset','cHourFrom','cHourTo'],
                ['.opreset','oneFrom','oneTo'],
-               ['.gpreset','gFrom','gTo']];
+               ['.gpreset','gFrom','gTo'],
+               ['.lpreset','lFrom','lTo']];
 PRESETS.forEach(([sel,f,t])=>document.querySelectorAll(sel).forEach(b=>
   b.addEventListener('click',()=>{$(f).value=b.dataset.f;$(t).value=b.dataset.t;recompute();})));
 // light up whichever preset matches the current hour window
