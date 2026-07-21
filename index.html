@@ -167,42 +167,27 @@
   </div>
 
   <div class="card">
-    <h2>Guarantee &mdash; how long does your collateral last?</h2>
-    <div class="fx">
-      <code>days = guarantee &divide; ( MW &times; hours/day &times; price you pay )</code>
-      <div class="fxn">You post collateral and sell 50&nbsp;MW &times; 4&nbsp;h through your counterparty. As a trader
-        group you are <b>never paid</b> on the favourable side (Rules &sect;7.6.1.3) &mdash; a negative price earns you
-        <b>&euro;0</b>, not money. So imbalance is <b>pure cost</b> and the guarantee only burns down.
-        This shows how many days / hours it lasts if you are <b>fully short</b> the whole window.</div>
-    </div>
+    <h2>Guarantee &mdash; is 40k enough?</h2>
     <div class="ctl" style="margin-bottom:14px">
-      <div class="fld"><label>Guarantee (&euro;)</label><input type="number" id="guar" value="50000" min="0" step="1000"></div>
-      <div class="fld"><label>MW sold (short if undelivered)</label><input type="number" id="gmw" value="50" min="0" step="1"></div>
-      <div class="fld"><label>Hours per day (local)</label>
+      <div class="fld"><label>Guarantee (&euro;)</label><input type="number" id="guar" value="40000" min="0" step="1000"></div>
+      <div class="fld"><label>Cost of a normal evening (&euro;)</label><input type="number" id="gobs" value="10000" min="0" step="500"></div>
+      <div class="fld"><label>Evening hours</label>
         <div class="row"><select id="gFrom"></select><span style="color:var(--mut)">to</span><select id="gTo"></select></div></div>
       <div class="fld"><label>Quick hours</label>
         <div class="presets">
-          <button class="gpreset" data-f="19" data-t="23">Evening 19-23</button>
+          <button class="gpreset" data-f="18" data-t="23">Evening 18-23</button>
+          <button class="gpreset" data-f="19" data-t="23">19-23</button>
           <button class="gpreset" data-f="18" data-t="22">Peak 18-22</button>
-          <button class="gpreset" data-f="11" data-t="15">Midday 11-15</button>
-          <button class="gpreset" data-f="0" data-t="24">All day</button>
         </div></div>
     </div>
     <div class="kpis" style="margin-bottom:16px">
-      <div class="kpi big"><div class="lbl">Guarantee lasts</div><div class="val neg" id="gDays">--</div><div class="meta" id="gDaysM"></div></div>
-      <div class="kpi"><div class="lbl">Price you pay</div><div class="val" id="gBurn">--</div><div class="meta" id="gBurnM"></div></div>
-      <div class="kpi"><div class="lbl">Cost per day</div><div class="val neg" id="gDay">--</div><div class="meta" id="gDayM"></div></div>
-      <div class="kpi"><div class="lbl">Runs out on</div><div class="val" id="gCross">--</div><div class="meta" id="gCrossM"></div></div>
-      <div class="kpi big"><div class="lbl">Guarantee covers</div><div class="val pos" id="gCover">--</div><div class="meta" id="gCoverM"></div></div>
-      <div class="kpi"><div class="lbl">Worst single day</div><div class="val neg" id="gWorst">--</div><div class="meta" id="gWorstM"></div></div>
+      <div class="kpi big"><div class="lbl">Evenings covered</div><div class="val pos" id="gDays">--</div><div class="meta" id="gDaysM"></div></div>
+      <div class="kpi big"><div class="lbl">Worst evening (Jun&ndash;Jul)</div><div class="val neg" id="gWorst">--</div><div class="meta" id="gWorstM"></div></div>
+      <div class="kpi"><div class="lbl">Bad evening (p90)</div><div class="val neg" id="gP90">--</div><div class="meta" id="gP90M"></div></div>
+      <div class="kpi big"><div class="lbl">Covers worst evening?</div><div class="val" id="gCover">--</div><div class="meta" id="gCoverM"></div></div>
+      <div class="kpi"><div class="lbl">Min guarantee needed</div><div class="val" id="gNeed">--</div><div class="meta" id="gNeedM"></div></div>
     </div>
-    <p class="note" id="gVerdict" style="border-left:3px solid var(--acc);padding:8px 12px;margin:0 0 12px;background:var(--sunk);font-size:13px"></p>
-    <canvas id="guarLine"></canvas>
-    <p class="note" id="guarNote"></p>
-    <p class="note"><b>Price you pay</b> is the average imbalance price over the window, counting negative quarters as
-      &euro;0 (you are not credited). <b>Simple average = volume-weighted average</b> here, because the MW is flat every
-      hour. The line runs the guarantee down at the <b>real daily cost</b> across the selected date range, worst case
-      (fully short every day) &mdash; where it hits zero is when the collateral is gone.</p>
+    <p class="note" id="gVerdict" style="border-left:3px solid var(--acc);padding:10px 12px;margin:0;background:var(--sunk);font-size:14px;line-height:1.6"></p>
   </div>
 
   <div class="card">
@@ -326,11 +311,6 @@ const payOpts=(()=>{const o=noLeg();
   o.plugins.tooltip={callbacks:{label:i=>fmt(i.parsed.y)+'% of quarters pay you'}};
   return o;})();
 const payHours=new Chart($('payHours'),{type:'bar',data:{labels:[],datasets:[]},options:payOpts});
-const guarOpts=(()=>{const o=noLeg();
-  o.scales.y.title={display:true,text:'Guarantee left (EUR)',color:'#a3b1c2'};
-  o.plugins.tooltip={callbacks:{label:i=>eur(i.parsed.y)+' left'}};
-  return o;})();
-const guarLine=new Chart($('guarLine'),{type:'line',data:{labels:[],datasets:[]},options:guarOpts});
 const daily=new Chart($('daily'),{type:'bar',data:{labels:[],datasets:[]},options:noLeg()});
 const prof=new Chart($('prof'),{type:'bar',data:{labels:[],datasets:[]},options:noLeg()});
 
@@ -542,62 +522,47 @@ function recompute(){
      +pct(mid.p,mid.n).toFixed(1)+'%</b> of quarters, <b class="neg">night (00-05) only '
      +pct(night.p,night.n).toFixed(1)+'%</b>'
      +(night.p?' &mdash; that is '+(pct(mid.p,mid.n)/pct(night.p,night.n)).toFixed(1)+'x more often at midday.':'.');}
-  // ---- guarantee / collateral coverage ----
-  // You are short GMW MW over the window; as a trader group you are never paid, so a
-  // negative price counts as 0, not income. Burn rate = mean(max(price,0)).
-  const G=+$('guar').value||0, GMW=+$('gmw').value||0;
+  // ---- guarantee: is 40k enough? anchored on YOUR observed cost per evening ----
+  // The LEVEL is yours (what a normal evening actually costs you, e.g. the boss's
+  // 10k). ENTSO-E gives only the day-to-day SHAPE: how much pricier the worst /
+  // a bad (p90) evening was than a normal one. worst = obs x worstPrice/avgPrice.
+  const G=+$('guar').value||0, OBS=+$('gobs').value||0;
   let gFh=+$('gFrom').value, gTh=+$('gTo').value; if(gTh<=gFh)gTh=gFh+1,$('gTo').value=gTh;
-  const gsub=dsub.filter(r=>{const h=r[1]/4|0;return h>=gFh&&h<gTh;});
-  const gpr=gsub.map(IMB).filter(v=>v!=null);
-  const burn=gpr.length?gpr.reduce((a,x)=>a+Math.max(x,0),0)/gpr.length:null;
-  const simple=gpr.length?gpr.reduce((a,x)=>a+x,0)/gpr.length:null;
-  const hpd=gTh-gFh;
-  const costDay=(burn==null)?null:GMW*hpd*burn;
-  const costHour=(burn==null)?null:GMW*burn;
-  const daysCov=costDay?G/costDay:null, hoursCov=costHour?G/costHour:null;
-  const dcost={};
-  gsub.forEach(r=>{const p=IMB(r);if(p==null)return;dcost[r[0]]=(dcost[r[0]]||0)+GMW*0.25*Math.max(p,0);});
-  let bal=G, cross=null, labs=[], rem=[];
-  dIdx.forEach(i=>{if(dcost[i]==null)return; bal-=dcost[i]; labs.push(DATES[i]); rem.push(Math.round(bal));
-    if(cross==null&&bal<=0)cross=DATES[i];});
-  const gDaily=[]; let worstD=null;
-  dIdx.forEach(i=>{if(dcost[i]==null)return; gDaily.push(dcost[i]);
-    if(worstD==null||dcost[i]>dcost[worstD])worstD=i;});
-  const worstV=daily.length?Math.max.apply(null,gDaily):null;
-  const overN=gDaily.filter(x=>x>G).length;
-  const coverPct=gDaily.length?100*(gDaily.length-overN)/gDaily.length:null;
-  $('gCover').textContent=coverPct==null?'--':coverPct.toFixed(0)+'%';
-  $('gCoverM').textContent=gDaily.length?'of '+gDaily.length+' days fit under '+eur(G):'';
-  $('gWorst').innerHTML=worstV==null?'--':eur(-worstV);
-  $('gWorstM').textContent=worstD!=null?DATES[worstD]:'';
-  $('gVerdict').innerHTML=gDaily.length?(
-    '<b>'+eur(G)+'</b> covers <b>'+coverPct.toFixed(0)+'%</b> of '+gDaily.length+' days · '
-    +'worst day <b>'+eur(-worstV)+'</b> ('+DATES[worstD]+') — '
-    +(worstV<=G?'margin <b class="pos">'+eur(G-worstV)+'</b>':'short by <b class="neg">'+eur(worstV-G)+'</b>')
-    +' · full cover needs <b>'+eur(worstV)+'</b>'):'';
-  guarLine.data.labels=labs;
-  guarLine.data.datasets=[{label:'guarantee left',data:rem,borderColor:'#f0b429',
-    backgroundColor:'#f0b42922',fill:true,tension:0,pointRadius:0,borderWidth:2,
-    segment:{borderColor:c=>c.p1.parsed.y<0?'#f85149':'#f0b429'}}];
-  guarLine.update();
-  $('gDays').innerHTML=daysCov==null?'--':daysCov.toFixed(1)+' <span class="un">days</span>';
-  $('gDaysM').textContent=hoursCov==null?'':hoursCov.toFixed(1)+' hours fully short at '+GMW+' MW';
-  $('gBurn').innerHTML=burn==null?'--':fmt(burn)+' <span class="un">€/MWh</span>';
-  $('gBurnM').textContent=simple==null?'':'simple avg '+fmt(simple)+' = volume-weighted (flat MW)';
-  $('gDay').innerHTML=costDay==null?'--':eur(-costDay);
-  $('gDayM').textContent=GMW+' MW × '+hpd+' h = '+fmt(GMW*hpd)+' MWh/day';
-  $('gCross').textContent=cross||'not in range';
-  $('gCrossM').textContent=cross?'gone if fully short daily from '+(labs[0]||''):'guarantee outlasts the range';
-  $('guarNote').innerHTML='At <b>'+eur(G)+'</b>, short <b>'+GMW+' MW</b> over <b>'+pad(gFh)+':00-'+pad(gTh)
-    +':00</b>: you pay <b>'+fmt(burn)+' €/MWh</b>, <b>'+eur(-(costDay||0))+'/day</b> → lasts <b>'
-    +(daysCov==null?'--':daysCov.toFixed(1)+' days</b>')
-    +(cross?'. Fully short every day from '+labs[0]+', it is gone by <b>'+cross+'</b>.':'.');
+  const perDay={};
+  dsub.forEach(r=>{const h=r[1]/4|0; if(h<gFh||h>=gTh)return; const p=IMB(r); if(p==null)return;
+    (perDay[r[0]]=perDay[r[0]]||[]).push(Math.max(p,0));});
+  const effP=Object.keys(perDay).map(k=>{const a=perDay[k];return a.reduce((x,y)=>x+y,0)/a.length;}).sort((a,b)=>a-b);
+  const nD=effP.length;
+  const avgP=nD?effP.reduce((a,b)=>a+b,0)/nD:0;
+  const worstP=nD?effP[nD-1]:0;
+  const p90P=nD?effP[Math.min(nD-1,Math.floor(0.9*nD))]:0;
+  const worstE=(avgP>0)?OBS*worstP/avgP:null;
+  const p90E=(avgP>0)?OBS*p90P/avgP:null;
+  const evenings=OBS>0?G/OBS:null;
+  const covers=(worstE!=null)&&(G>=worstE);
+  $('gDays').innerHTML=evenings==null?'--':evenings.toFixed(1);
+  $('gDaysM').textContent=OBS?'at '+eur(OBS)+' per normal evening':'';
+  $('gWorst').innerHTML=worstE==null?'--':eur(-worstE);
+  $('gWorstM').textContent=nD?'prices '+(worstP/avgP).toFixed(1)+'x a normal evening':'';
+  $('gP90').innerHTML=p90E==null?'--':eur(-p90E);
+  $('gP90M').textContent=nD?'1 evening in 10 is this bad':'';
+  $('gCover').innerHTML=worstE==null?'--':(covers?'<span class="pos">YES</span>':'<span class="neg">NO</span>');
+  $('gCover').className='val';
+  $('gCoverM').innerHTML=worstE==null?'':(covers?'margin '+eur(G-worstE):'short by '+eur(worstE-G));
+  $('gNeed').innerHTML=worstE==null?'--':eur(worstE);
+  $('gNeedM').textContent='covers every evening here';
+  $('gVerdict').innerHTML=(nD&&OBS>0)?(
+    '<b>'+eur(G)+'</b> = <b>'+evenings.toFixed(1)+' normal evenings</b> at '+eur(OBS)+'. '
+    +'Worst evening in '+nD+' days ('+pad(gFh)+'-'+pad(gTh)+'h): <b>'+eur(-worstE)+'</b> '
+    +'(prices '+(worstP/avgP).toFixed(1)+'x normal). '
+    +(covers?'<b class="pos">'+eur(G)+' covers it, margin '+eur(G-worstE)+'.</b>'
+           :'<b class="neg">'+eur(G)+' short by '+eur(worstE-G)+' &mdash; need '+eur(worstE)+'.</b>')):'';
   syncPresets();
 }
 
 document.querySelectorAll('input,select').forEach(el=>el.addEventListener('change',recompute));
 $('qty').addEventListener('input',recompute);
-['guar','gmw'].forEach(id=>$(id).addEventListener('input',recompute));
+['guar','gobs'].forEach(id=>$(id).addEventListener('input',recompute));
 // Each preset row drives ONLY its own card. ':not(.cpreset):not(.opreset)' matters:
 // the calculator and one-day rows live inside .presets too, so a bare
 // '.presets button' would make their buttons also move the top filter.
