@@ -193,7 +193,10 @@
       <div class="kpi"><div class="lbl">Price you pay</div><div class="val" id="gBurn">--</div><div class="meta" id="gBurnM"></div></div>
       <div class="kpi"><div class="lbl">Cost per day</div><div class="val neg" id="gDay">--</div><div class="meta" id="gDayM"></div></div>
       <div class="kpi"><div class="lbl">Runs out on</div><div class="val" id="gCross">--</div><div class="meta" id="gCrossM"></div></div>
+      <div class="kpi big"><div class="lbl">Guarantee covers</div><div class="val pos" id="gCover">--</div><div class="meta" id="gCoverM"></div></div>
+      <div class="kpi"><div class="lbl">Worst single day</div><div class="val neg" id="gWorst">--</div><div class="meta" id="gWorstM"></div></div>
     </div>
+    <p class="note" id="gVerdict" style="border-left:3px solid var(--acc);padding:8px 12px;margin:0 0 12px;background:var(--sunk);font-size:13px"></p>
     <canvas id="guarLine"></canvas>
     <p class="note" id="guarNote"></p>
     <p class="note"><b>Price you pay</b> is the average imbalance price over the window, counting negative quarters as
@@ -557,6 +560,21 @@ function recompute(){
   let bal=G, cross=null, labs=[], rem=[];
   dIdx.forEach(i=>{if(dcost[i]==null)return; bal-=dcost[i]; labs.push(DATES[i]); rem.push(Math.round(bal));
     if(cross==null&&bal<=0)cross=DATES[i];});
+  const daily=[]; let worstD=null;
+  dIdx.forEach(i=>{if(dcost[i]==null)return; daily.push(dcost[i]);
+    if(worstD==null||dcost[i]>dcost[worstD])worstD=i;});
+  const worstV=daily.length?Math.max.apply(null,daily):null;
+  const overN=daily.filter(x=>x>G).length;
+  const coverPct=daily.length?100*(daily.length-overN)/daily.length:null;
+  $('gCover').textContent=coverPct==null?'--':coverPct.toFixed(0)+'%';
+  $('gCoverM').textContent=daily.length?'of '+daily.length+' days fit under '+eur(G):'';
+  $('gWorst').innerHTML=worstV==null?'--':eur(-worstV);
+  $('gWorstM').textContent=worstD!=null?DATES[worstD]:'';
+  $('gVerdict').innerHTML=daily.length?(
+    '<b>'+eur(G)+'</b> covers <b>'+coverPct.toFixed(0)+'%</b> of '+daily.length+' days · '
+    +'worst day <b>'+eur(-worstV)+'</b> ('+DATES[worstD]+') — '
+    +(worstV<=G?'margin <b class="pos">'+eur(G-worstV)+'</b>':'short by <b class="neg">'+eur(worstV-G)+'</b>')
+    +' · full cover needs <b>'+eur(worstV)+'</b>'):'';
   guarLine.data.labels=labs;
   guarLine.data.datasets=[{label:'guarantee left',data:rem,borderColor:'#f0b429',
     backgroundColor:'#f0b42922',fill:true,tension:0,pointRadius:0,borderWidth:2,
