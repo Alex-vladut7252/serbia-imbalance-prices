@@ -167,6 +167,42 @@
   </div>
 
   <div class="card">
+    <h2>Guarantee &mdash; how long does your collateral last?</h2>
+    <div class="fx">
+      <code>days = guarantee &divide; ( MW &times; hours/day &times; price you pay )</code>
+      <div class="fxn">You post collateral and sell 50&nbsp;MW &times; 4&nbsp;h through your counterparty. As a trader
+        group you are <b>never paid</b> on the favourable side (Rules &sect;7.6.1.3) &mdash; a negative price earns you
+        <b>&euro;0</b>, not money. So imbalance is <b>pure cost</b> and the guarantee only burns down.
+        This shows how many days / hours it lasts if you are <b>fully short</b> the whole window.</div>
+    </div>
+    <div class="ctl" style="margin-bottom:14px">
+      <div class="fld"><label>Guarantee (&euro;)</label><input type="number" id="guar" value="50000" min="0" step="1000"></div>
+      <div class="fld"><label>MW sold (short if undelivered)</label><input type="number" id="gmw" value="50" min="0" step="1"></div>
+      <div class="fld"><label>Hours per day (local)</label>
+        <div class="row"><select id="gFrom"></select><span style="color:var(--mut)">to</span><select id="gTo"></select></div></div>
+      <div class="fld"><label>Quick hours</label>
+        <div class="presets">
+          <button class="gpreset" data-f="19" data-t="23">Evening 19-23</button>
+          <button class="gpreset" data-f="18" data-t="22">Peak 18-22</button>
+          <button class="gpreset" data-f="11" data-t="15">Midday 11-15</button>
+          <button class="gpreset" data-f="0" data-t="24">All day</button>
+        </div></div>
+    </div>
+    <div class="kpis" style="margin-bottom:16px">
+      <div class="kpi big"><div class="lbl">Guarantee lasts</div><div class="val neg" id="gDays">--</div><div class="meta" id="gDaysM"></div></div>
+      <div class="kpi"><div class="lbl">Price you pay</div><div class="val" id="gBurn">--</div><div class="meta" id="gBurnM"></div></div>
+      <div class="kpi"><div class="lbl">Cost per day</div><div class="val neg" id="gDay">--</div><div class="meta" id="gDayM"></div></div>
+      <div class="kpi"><div class="lbl">Runs out on</div><div class="val" id="gCross">--</div><div class="meta" id="gCrossM"></div></div>
+    </div>
+    <canvas id="guarLine"></canvas>
+    <p class="note" id="guarNote"></p>
+    <p class="note"><b>Price you pay</b> is the average imbalance price over the window, counting negative quarters as
+      &euro;0 (you are not credited). <b>Simple average = volume-weighted average</b> here, because the MW is flat every
+      hour. The line runs the guarantee down at the <b>real daily cost</b> across the selected date range, worst case
+      (fully short every day) &mdash; where it hits zero is when the collateral is gone.</p>
+  </div>
+
+  <div class="card">
     <h2>When do you get paid?</h2>
     <div class="kpis" style="margin-bottom:16px">
       <div class="kpi big"><div class="lbl">They pay you</div><div class="val pos" id="sPaid">--</div><div class="meta" id="sPaidM"></div></div>
@@ -269,6 +305,10 @@ const mLine=m=>m==null?'#8b98a9':(m===0?'#8b98a9':(m>0?'#3fb950':'#f85149'));
   for(let h=0;h<24;h++)of.add(new Option(pad(h)+':00',h));
   for(let h=1;h<=24;h++)ot.add(new Option(pad(h)+':00',h));
   od.value='2026-07-15'; of.value=0; ot.value=24;
+  const gf=$('gFrom'),gt=$('gTo');
+  for(let h=0;h<24;h++)gf.add(new Option(pad(h)+':00',h));
+  for(let h=1;h<=24;h++)gt.add(new Option(pad(h)+':00',h));
+  gf.value=19; gt.value=23;
 })();
 
 const grid={color:'#2a3441'}, tick={color:'#a3b1c2'};
@@ -283,6 +323,11 @@ const payOpts=(()=>{const o=noLeg();
   o.plugins.tooltip={callbacks:{label:i=>fmt(i.parsed.y)+'% of quarters pay you'}};
   return o;})();
 const payHours=new Chart($('payHours'),{type:'bar',data:{labels:[],datasets:[]},options:payOpts});
+const guarOpts=(()=>{const o=noLeg();
+  o.scales.y.title={display:true,text:'Guarantee left (EUR)',color:'#a3b1c2'};
+  o.plugins.tooltip={callbacks:{label:i=>eur(i.parsed.y)+' left'}};
+  return o;})();
+const guarLine=new Chart($('guarLine'),{type:'line',data:{labels:[],datasets:[]},options:guarOpts});
 const daily=new Chart($('daily'),{type:'bar',data:{labels:[],datasets:[]},options:noLeg()});
 const prof=new Chart($('prof'),{type:'bar',data:{labels:[],datasets:[]},options:noLeg()});
 
@@ -494,17 +539,54 @@ function recompute(){
      +pct(mid.p,mid.n).toFixed(1)+'%</b> of quarters, <b class="neg">night (00-05) only '
      +pct(night.p,night.n).toFixed(1)+'%</b>'
      +(night.p?' &mdash; that is '+(pct(mid.p,mid.n)/pct(night.p,night.n)).toFixed(1)+'x more often at midday.':'.');}
+  // ---- guarantee / collateral coverage ----
+  // You are short GMW MW over the window; as a trader group you are never paid, so a
+  // negative price counts as 0, not income. Burn rate = mean(max(price,0)).
+  const G=+$('guar').value||0, GMW=+$('gmw').value||0;
+  let gFh=+$('gFrom').value, gTh=+$('gTo').value; if(gTh<=gFh)gTh=gFh+1,$('gTo').value=gTh;
+  const gsub=dsub.filter(r=>{const h=r[1]/4|0;return h>=gFh&&h<gTh;});
+  const gpr=gsub.map(IMB).filter(v=>v!=null);
+  const burn=gpr.length?gpr.reduce((a,x)=>a+Math.max(x,0),0)/gpr.length:null;
+  const simple=gpr.length?gpr.reduce((a,x)=>a+x,0)/gpr.length:null;
+  const hpd=gTh-gFh;
+  const costDay=(burn==null)?null:GMW*hpd*burn;
+  const costHour=(burn==null)?null:GMW*burn;
+  const daysCov=costDay?G/costDay:null, hoursCov=costHour?G/costHour:null;
+  const dcost={};
+  gsub.forEach(r=>{const p=IMB(r);if(p==null)return;dcost[r[0]]=(dcost[r[0]]||0)+GMW*0.25*Math.max(p,0);});
+  let bal=G, cross=null, labs=[], rem=[];
+  dIdx.forEach(i=>{if(dcost[i]==null)return; bal-=dcost[i]; labs.push(DATES[i]); rem.push(Math.round(bal));
+    if(cross==null&&bal<=0)cross=DATES[i];});
+  guarLine.data.labels=labs;
+  guarLine.data.datasets=[{label:'guarantee left',data:rem,borderColor:'#f0b429',
+    backgroundColor:'#f0b42922',fill:true,tension:0,pointRadius:0,borderWidth:2,
+    segment:{borderColor:c=>c.p1.parsed.y<0?'#f85149':'#f0b429'}}];
+  guarLine.update();
+  $('gDays').innerHTML=daysCov==null?'--':daysCov.toFixed(1)+' <span class="un">days</span>';
+  $('gDaysM').textContent=hoursCov==null?'':hoursCov.toFixed(1)+' hours fully short at '+GMW+' MW';
+  $('gBurn').innerHTML=burn==null?'--':fmt(burn)+' <span class="un">€/MWh</span>';
+  $('gBurnM').textContent=simple==null?'':'simple avg '+fmt(simple)+' = volume-weighted (flat MW)';
+  $('gDay').innerHTML=costDay==null?'--':eur(-costDay);
+  $('gDayM').textContent=GMW+' MW × '+hpd+' h = '+fmt(GMW*hpd)+' MWh/day';
+  $('gCross').textContent=cross||'not in range';
+  $('gCrossM').textContent=cross?'gone if fully short daily from '+(labs[0]||''):'guarantee outlasts the range';
+  $('guarNote').innerHTML='At <b>'+eur(G)+'</b>, short <b>'+GMW+' MW</b> over <b>'+pad(gFh)+':00-'+pad(gTh)
+    +':00</b>: you pay <b>'+fmt(burn)+' €/MWh</b>, <b>'+eur(-(costDay||0))+'/day</b> → lasts <b>'
+    +(daysCov==null?'--':daysCov.toFixed(1)+' days</b>')
+    +(cross?'. Fully short every day from '+labs[0]+', it is gone by <b>'+cross+'</b>.':'.');
   syncPresets();
 }
 
 document.querySelectorAll('input,select').forEach(el=>el.addEventListener('change',recompute));
 $('qty').addEventListener('input',recompute);
+['guar','gmw'].forEach(id=>$(id).addEventListener('input',recompute));
 // Each preset row drives ONLY its own card. ':not(.cpreset):not(.opreset)' matters:
 // the calculator and one-day rows live inside .presets too, so a bare
 // '.presets button' would make their buttons also move the top filter.
-const PRESETS=[['.presets button:not(.cpreset):not(.opreset)','hourFrom','hourTo'],
+const PRESETS=[['.presets button:not(.cpreset):not(.opreset):not(.gpreset)','hourFrom','hourTo'],
                ['.cpreset','cHourFrom','cHourTo'],
-               ['.opreset','oneFrom','oneTo']];
+               ['.opreset','oneFrom','oneTo'],
+               ['.gpreset','gFrom','gTo']];
 PRESETS.forEach(([sel,f,t])=>document.querySelectorAll(sel).forEach(b=>
   b.addEventListener('click',()=>{$(f).value=b.dataset.f;$(t).value=b.dataset.t;recompute();})));
 // light up whichever preset matches the current hour window
