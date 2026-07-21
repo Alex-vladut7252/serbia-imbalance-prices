@@ -51,6 +51,7 @@
   .kpi.big .val{font-size:30px}
   .val.pos{color:var(--pos)} .val.neg{color:var(--neg)}
   .note{color:var(--mut);font-size:12px;margin-top:8px}
+  .sub3{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin:0 0 8px}
   b.pos{color:var(--pos)} b.neg{color:var(--neg)}
   .fx{border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin:0 0 14px;background:var(--sunk)}
   .fx code{font-size:15px;color:var(--fg);display:block;line-height:1.6}
@@ -80,19 +81,18 @@
   <p class="sub">Control area 10YCS-SERBIATSOV &middot; 15-min settlement &middot; Europe/Belgrade time &middot;
      ENTSO-E docType A85 (price) + A86 (direction). Serbia runs a <b>single imbalance price</b>.</p>
   <div class="card">
-    <h2>Filters</h2>
+    <h2>1 &middot; Period &mdash; the dates your imbalance covers</h2>
     <div class="ctl">
       <div class="fld"><label>From date</label><input type="date" id="startDate" min="2025-12-30" max="2026-07-16" value="2026-07-02"></div>
       <div class="fld"><label>To date</label><input type="date" id="endDate" min="2025-12-30" max="2026-07-16" value="2026-07-15"></div>
     </div>
+    <p class="note" style="margin:10px 0 0">Both tables below are computed <b>only for these dates</b>. Price depends
+      heavily on when the imbalance falls, so the period is part of the number.</p>
   </div>
 
 
-
-
-
   <div class="card">
-    <h2>4-hour blocks to sell &mdash; every window, ranked</h2>
+    <h2>2 &middot; 4-hour blocks &mdash; which hours are cheapest to be short</h2>
     <div class="ctl" style="margin-bottom:14px">
       <div class="fld"><label>Quantity (MW)</label><input type="number" id="gmw" value="50" min="0" step="1"></div>
       <div class="fld"><label>Guarantee (&euro;)</label><input type="number" id="guar" value="40000" min="0" step="1000"></div>
@@ -106,33 +106,38 @@
   </div>
 
   <div class="card">
-    <h2>Guarantee ledger &mdash; day by day, cumulative (continuity)</h2>
+    <h2>3 &middot; Guarantee &mdash; how much imbalance it survives</h2>
+    <p class="note" style="margin:0 0 12px">Set <b>when</b> you're in imbalance and <b>how much</b>. Every figure uses the
+      <b>real ENTSO-E price for exactly those hours, on the dates above</b> &mdash; evening is ~2.6&times; pricier than
+      midday, so the period is baked into the price.</p>
     <div class="ctl" style="margin-bottom:14px">
-      <div class="fld"><label>Guarantee (&euro;)</label><input type="number" id="lguar" value="40000" min="0" step="1000"></div>
-      <div class="fld"><label>Imbalance (MW short)</label><input type="number" id="lmw" value="50" min="0" step="1"></div>
-      <div class="fld"><label>Hours (local)</label>
+      <div class="fld"><label>Imbalance hours (local)</label>
         <div class="row"><select id="lFrom"></select><span style="color:var(--mut)">to</span><select id="lTo"></select></div></div>
       <div class="fld"><label>Quick hours</label>
         <div class="presets">
           <button class="lpreset" data-f="18" data-t="22">Peak 18-22</button>
           <button class="lpreset" data-f="18" data-t="23">Evening 18-23</button>
+          <button class="lpreset" data-f="10" data-t="16">Midday</button>
           <button class="lpreset" data-f="0" data-t="24">All day</button>
         </div></div>
+      <div class="fld"><label>Imbalance (MW short)</label><input type="number" id="lmw" value="50" min="0" step="1"></div>
+      <div class="fld"><label>Guarantee (&euro;)</label><input type="number" id="lguar" value="40000" min="0" step="1000"></div>
     </div>
-    <div class="kpis" style="margin-bottom:16px">
+    <div class="kpis" style="margin-bottom:18px">
+      <div class="kpi big"><div class="lbl">Avg price &mdash; these hours</div><div class="val" id="lAvg">--</div><div class="meta" id="lAvgM"></div></div>
       <div class="kpi big"><div class="lbl">Guarantee lasts</div><div class="val neg" id="lDays">--</div><div class="meta" id="lDaysM"></div></div>
-      <div class="kpi"><div class="lbl">Net over range</div><div class="val" id="lNet">--</div><div class="meta" id="lNetM"></div></div>
+      <div class="kpi big"><div class="lbl">Max avg MW it survives</div><div class="val" id="lMax">--</div><div class="meta" id="lMaxM"></div></div>
+      <div class="kpi"><div class="lbl">Net over period</div><div class="val" id="lNet">--</div><div class="meta" id="lNetM"></div></div>
       <div class="kpi"><div class="lbl">Total paid</div><div class="val neg" id="lLost">--</div><div class="meta" id="lLostM"></div></div>
-      <div class="kpi"><div class="lbl">Total received</div><div class="val pos" id="lWon">--</div><div class="meta" id="lWonM"></div></div>
       <div class="kpi"><div class="lbl">Worst day</div><div class="val neg" id="lWorst">--</div><div class="meta" id="lWorstM"></div></div>
-      <div class="kpi big"><div class="lbl">Max avg MW over range</div><div class="val" id="lMax">--</div><div class="meta" id="lMaxM"></div></div>
     </div>
-    <h3 style="font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin:0 0 8px">How many days the guarantee lasts at each imbalance level</h3>
-    <div id="lSens" style="overflow-x:auto;margin-bottom:16px"></div>
-    <div id="lTable" style="overflow:auto;max-height:60vh;border:1px solid var(--bd);border-radius:8px"></div>
-    <p class="note">Real days, in order, at your MW and hours. <b>Day P&amp;L</b> = &minus;MW &times; 0.25h &times; price per
-      quarter, summed (price positive &rarr; you pay, negative &rarr; credited). <b>Cumulative</b> runs the total; <b>Guarantee
-      left</b> = guarantee + cumulative. Where it goes red, the collateral is used up. Follows the date range up top.</p>
+    <h3 class="sub3">Days the guarantee lasts at each imbalance level</h3>
+    <div id="lSens" style="overflow-x:auto;margin-bottom:20px"></div>
+    <h3 class="sub3">Day by day &mdash; running balance</h3>
+    <div id="lTable" style="overflow:auto;max-height:55vh;border:1px solid var(--bd);border-radius:8px"></div>
+    <p class="note">Real days, in order, at your MW and hours. <b>Day P&amp;L</b> = &minus;MW &times; 0.25h &times; price
+      per quarter, summed. <b>Cumulative</b> runs the total; <b>Guarantee left</b> = guarantee + cumulative &mdash; where
+      it turns red, the collateral is used up.</p>
   </div>
 
 
@@ -200,9 +205,9 @@ function recompute(){
   // ---- guarantee ledger + sensitivity ----
   const LG=+$('lguar').value||0, LMW=+$('lmw').value||0;
   let lfh=+$('lFrom').value, lth=+$('lTo').value; if(lth<=lfh)lth=lfh+1,$('lTo').value=lth;
-  const pday={};                                  // EUR per 1 MW per day (signed): 0.25 x price summed
+  const pday={}; const winP=[];                   // pday: EUR per 1 MW per day (0.25 x price summed)
   dsub.forEach(r=>{const h=r[1]/4|0; if(h<lfh||h>=lth)return; const p=IMB(r); if(p==null)return;
-    pday[r[0]]=(pday[r[0]]||0)+0.25*p;});
+    pday[r[0]]=(pday[r[0]]||0)+0.25*p; winP.push(p);});
   let cum=0, exh=null, daysLast=null, lost=0, won=0, worstV=null, worstD=null, nrows=0, cumPrice=0;
   const cumPriceArr=[];
   let lt2='<table><thead><tr><th>Date</th><th>Day P&amp;L</th><th>Cumulative</th><th>Guarantee left</th></tr></thead><tbody>';
@@ -220,8 +225,10 @@ function recompute(){
   $('lNet').innerHTML=nrows?eur(cum):'--'; $('lNet').className='val '+(cum>=0?'pos':'neg');
   $('lNetM').textContent=nrows?nrows+' days, '+LMW+' MW, '+pad(lfh)+'-'+pad(lth)+'h':'';
   $('lLost').innerHTML=nrows?eur(lost):'--'; $('lLostM').textContent=nrows?'days you paid':'';
-  $('lWon').innerHTML=nrows?eur(won):'--'; $('lWonM').textContent=nrows?'days credited':'';
   $('lWorst').innerHTML=worstV==null?'--':eur(worstV); $('lWorstM').textContent=worstD!=null?DATES[worstD]:'';
+  const avgWin=winP.length?winP.reduce((a,x)=>a+x,0)/winP.length:null;
+  $('lAvg').innerHTML=avgWin==null?'--':fmt(avgWin)+' <span class="un">&euro;/MWh</span>';
+  $('lAvgM').textContent=nrows?pad(lfh)+'-'+pad(lth)+'h · '+winP.length+' quarters over '+nrows+' days':'';
   // max constant MW you could be short over the whole range before the guarantee is gone
   const maxMW=(cumPrice>0)?LG/cumPrice:null;
   $('lMax').innerHTML=maxMW==null?'&infin;':fmt(maxMW)+' <span class="un">MW</span>';
